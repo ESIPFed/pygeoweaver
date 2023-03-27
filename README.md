@@ -68,4 +68,21 @@ geoweaver.history_workflow()
 geoweaver.history_process()
 ```
 
-9. 
+9. To check the source code of a process
+
+```
+geoweaver.detail_processs(process_id)
+```
+
+10. To check the configuration of a workflow
+
+```
+geoweaver.detail_workflow(workflow_id)
+```
+
+11. To check the details of a host:
+
+```
+geoweaver.detail_host(host_id)
+```
+
