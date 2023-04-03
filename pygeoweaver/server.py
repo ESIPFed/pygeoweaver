@@ -8,17 +8,22 @@ open Geoweaver GUI in the output cell (if gui is not disabld.)
 
 """
 
+def download_geoweaver():
+    """
+    Download Geoweaver to user home directory
+    """
+    
 
 def start():
     print("start Geoweaver instance..")
-    result = subprocess.run(['java', '-jar', 'geoweaver.jar'], capture_output=True, text=True)
+    result = subprocess.run(['start.sh'], capture_output=True, text=True)
     print(result.stdout)
     print(result.stderr)
 
 
 def stop():
     print("stop Geoweaver instance..")
-    result = subprocess.run(['java', '-jar', 'geoweaver.jar'], capture_output=True, text=True)
+    result = subprocess.run(['stop.sh'], capture_output=True, text=True)
     print(result.stdout)
     print(result.stderr)
 
