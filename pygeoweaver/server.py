@@ -12,7 +12,8 @@ def download_geoweaver():
     """
     Download Geoweaver to user home directory
     """
-    
+    pass
+
 
 def start():
     print("start Geoweaver instance..")
