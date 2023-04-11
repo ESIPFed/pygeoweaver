@@ -18,7 +18,7 @@ def main():
     #list_processes()
     #list_workflows()
     # show history
-    show_process_history("xxx")
+    show_process_history("gfvnp8a7rgh")
 
 
 if __name__ == "__main__":
