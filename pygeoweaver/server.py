@@ -1,6 +1,6 @@
 import os
 import subprocess
-from utils import get_root_dir
+from pygeoweaver.utils import get_root_dir
 
 """
 This module provides function to start and stop Geoweaver server.

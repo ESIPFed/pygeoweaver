@@ -1,5 +1,7 @@
-
+import subprocess
+from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_root_dir
 
 def list_processes():
-    print("all the geoweaver cli")
-    pass
+    download_geoweaver_jar()
+    subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
+    subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "list", "--process"], cwd=f"{get_root_dir()}/")
