@@ -2,9 +2,10 @@ import subprocess
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_root_dir
 
 
-def run_process(host_id):
+def run_process(*, process_id, host_id, password, environment):
     if not host_id:
         raise RuntimeError("Host id is missing")
     download_geoweaver_jar()
-    subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "process", f"--host-id={host_id}"], 
+    subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "process", f"--host={host_id}",
+                    f"--password={password}", f"--environment={environment}", process_id],
                    cwd=f"{get_root_dir()}/")

@@ -1,4 +1,6 @@
 from pygeoweaver.list_hosts import list_hosts
+from pygeoweaver.run_process import run_process
+from pygeoweaver.run_workflow import run_worklfow
 from pygeoweaver.server import start, stop, download_geoweaver
 from pygeoweaver.history_process import show_process_history as history_process
 from pygeoweaver.detail_host import detail_host
@@ -8,7 +10,6 @@ from pygeoweaver.export_workflow import export_workflow
 from pygeoweaver.list_workflows import list_workflows
 from pygeoweaver.list_processes import list_processes
 from pygeoweaver.history_workflow import show_workflow_history as history_workflow
-
 
 # export only the specified functions
 
@@ -24,5 +25,7 @@ __all__ = [
     'list_hosts',
     'list_workflows',
     'list_processes',
-    'server'
+    'server',
+    'run_process',
+    'run_workflow'
 ]
