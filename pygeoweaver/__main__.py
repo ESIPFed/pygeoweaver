@@ -8,15 +8,16 @@ from pygeoweaver.list_processes import list_processes
 from pygeoweaver.list_workflows import list_workflows
 from pygeoweaver.server import start, stop
 
+
 def main():
     # start geoweaver
-    #start()
+    # start()
     # stop geoweaver
     # stop()
     # list resources
-    #list_hosts()
-    #list_processes()
-    #list_workflows()
+    # list_hosts()
+    # list_processes()
+    # list_workflows()
     # show history
     show_process_history("gfvnp8a7rgh")
 
