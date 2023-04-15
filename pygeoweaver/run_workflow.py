@@ -2,7 +2,7 @@ import subprocess
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_root_dir
 
 
-def run_worklfow(workflow_id, workflow_folder_path, workflow_zip_file_path, environments, hosts, passwords):
+def run_worklfow(*, workflow_id, workflow_folder_path, workflow_zip_file_path, environments, host, password):
     """
     Missing required parameter: '<workflowId>'
     Usage: <main class> run workflow [-d=<workflowFolderPath>]
@@ -18,13 +18,26 @@ def run_worklfow(workflow_id, workflow_folder_path, workflow_zip_file_path, envi
     -h, --hosts=<hostStrings>  hosts to run on
     -p, --passwords=<passes>   passwords to the target hosts
     """
-    if not workflow_id:
-        raise RuntimeError("Workflow id is missing")
     download_geoweaver_jar()
-    subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id, 
-                    "-d", workflow_folder_path,
-                    "-e", environments,
-                    "-f", workflow_zip_file_path, 
-                    "-h", hosts,
-                    "-p", passwords], 
-                   cwd=f"{get_root_dir()}/")
+
+    if workflow_folder_path and workflow_zip_file_path:
+        raise RuntimeError("Please provide either Folder path or Zip path")
+
+    if workflow_folder_path and not workflow_zip_file_path:
+        # command to run workflow from folder
+        subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
+                        "-d", workflow_folder_path,
+                        "-e", environments,
+                        "-h", host,
+                        "-p", password],
+                       cwd=f"{get_root_dir()}/")
+
+    if not workflow_folder_path and workflow_zip_file_path:
+        subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
+                        "-e", environments,
+                        "-f", workflow_zip_file_path,
+                        "-h", host,
+                        "-p", password],
+                       cwd=f"{get_root_dir()}/")
+
+    raise RuntimeError("Please provide either zip path or directory path to run workflow.")
