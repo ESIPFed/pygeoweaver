@@ -33,3 +33,7 @@ def main():
     #import_workflow("/Users/joe/Downloads/gr3ykr8dynu12vrwq11oy.zip")
     # export workflow
     export_worklfow("gr3ykr8dynu12vrwq11oy", "4", "/Users/joe/Downloads/test_pygeoweaver_export.zip")
+
+
+if __name__ == "__main__":
+     main()

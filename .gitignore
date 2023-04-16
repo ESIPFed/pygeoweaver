@@ -4,6 +4,6 @@ dist/*
 *.pyc
 */*.pyc
 .idea/
-pygeoweaver/__pycache__/*
+*/__pycache__/*
 *.pyc
 *.pyc
