@@ -2,4 +2,8 @@ build/*
 dist/*
 *egg-info*
 *.pyc
+*/*.pyc
 .idea/
+pygeoweaver/__pycache__/*
+*.pyc
+*.pyc
