@@ -22,7 +22,7 @@ classifiers = [
 
 [tool.poetry]
 name = "pygeoweaver"
-version = "0.6.0"
+version = "0.6.2"
 description = "This is a wrapper package of the Geoweaver app."
 authors = ["Geoweaver team <geoweaver.app@gmail.com>"]
 readme = "README.md"
