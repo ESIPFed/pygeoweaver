@@ -12,6 +12,6 @@ def import_workflow(workflow_zip_file_path):
   if not workflow_zip_file_path:
         raise RuntimeError("Workflow zip file path is missing")
   download_geoweaver_jar()
-  subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "import", "workflow", workflow_zip_file_path], 
-                  cwd=f"{get_root_dir()}/")
+  subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "import", 
+                  "workflow", workflow_zip_file_path], cwd=f"{get_root_dir()}/")
 

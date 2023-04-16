@@ -10,15 +10,15 @@ def export_worklfow(workflow_id, mode, target_file_path):
       <target_file_path>     target file path to save the workflow zip
       --mode=<export_mode>   exportation model options:
                                 1 - workflow only
-                                 2 - workflow with process code
+                                2 - workflow with process code
                                 3 - workflow with process code and only good
                                history
-                              4 - workflow with process code and all the
+                                4 - workflow with process code and all the
                                history.default option is 4.
     """
     if not workflow_id:
         raise RuntimeError("Workflow id is missing")
     download_geoweaver_jar()
-    subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "export", "workflow", workflow_id, target_file_path,
-                    "--mode", mode,], 
+    subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "export", "workflow", 
+                    f"--mode={mode}", workflow_id, target_file_path,], 
                    cwd=f"{get_root_dir()}/")
