@@ -1,6 +1,6 @@
 import os
 import subprocess
-from pygeoweaver.utils import get_root_dir
+from pygeoweaver.utils import checkOS, download_geoweaver_jar, get_root_dir
 
 """
 This module provides function to start and stop Geoweaver server.
@@ -9,22 +9,21 @@ open Geoweaver GUI in the output cell (if gui is not disabld.)
 
 """
 
-def download_geoweaver():
-    """
-    Download Geoweaver to user home directory
-    """
-    pass
 
-
-def start():
-    print("start Geoweaver instance..")
-    result = subprocess.run(['./start.sh'], cwd=f"{get_root_dir()}/")
+def start(force=False):
+    download_geoweaver_jar(overwrite=force)
+    if checkOS() == 3:
+        raise RuntimeError("windows is not supported yet")
+    else:
+        result = subprocess.run(['./start.sh'], cwd=f"{get_root_dir()}/")
     
 
 
 def stop():
-    print("stop Geoweaver instance..")
-    result = subprocess.run(['./stop.sh'], cwd=f"{get_root_dir()}/", shell=True)
+    if checkOS() == 3:
+        raise RuntimeError("Windows is not supported yet")
+    else:
+        result = subprocess.run(['./stop.sh'], cwd=f"{get_root_dir()}/", shell=True)
     
 
 

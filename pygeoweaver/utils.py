@@ -1,7 +1,7 @@
 import os
 import subprocess
 import requests
-
+import platform
 
 def get_home_dir():
     return os.path.expanduser('~')
@@ -39,3 +39,12 @@ def download_geoweaver_jar(overwrite=False):
 
     else:
         raise RuntimeError("Fail to download geoweaver.jar")
+
+
+def checkOS():
+    if platform.system() == "Linux" or platform == "Linux2":
+        return 1
+    elif platform.system() == "Darwin":
+        return 2
+    elif platform == "Windows":
+        return 3
