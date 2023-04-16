@@ -1,15 +1,9 @@
 #!/bin/bash
 
-FILE=~/geoweaver.jar
-if [ -f "$FILE" ]; then
-    echo "$FILE exists. Skip downloading.."
-else
-    echo "Downloading the latest geoweaver.jar to user home directory"
-    cd ~ && curl -OL https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar
-fi
-
 echo "Stop running Geoweaver if any.."
-kill $(ps aux | grep 'geoweaver.jar' | awk '{print $2}')
+pkill -f geoweaver
+
+
 
 echo "Start Geoweaver.."
 nohup java -jar ~/geoweaver.jar > ~/geoweaver.log &
@@ -23,6 +17,7 @@ do
     ((counter++))
 done
 
+cat ~/geoweaver.log
 if [ $counter == 20 ] ; then
     echo "Error: Geoweaver is not up"
     exit 1

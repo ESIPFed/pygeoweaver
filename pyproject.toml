@@ -1,11 +1,10 @@
 [build-system]
-requires = [
-    
-]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "pygeoweaver"
-version = "0.0.1"
+version = "0.6.2"
 authors = [
   { name="Geoweaver team", email="geoweaver.app@gmail.com" },
 ]
@@ -21,4 +20,17 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/ESIPFed/pygeoweaver"
 
+[tool.poetry]
+name = "pygeoweaver"
+version = "0.6.2"
+description = "This is a wrapper package of the Geoweaver app."
+authors = ["Geoweaver team <geoweaver.app@gmail.com>"]
+readme = "README.md"
+homepage = "https://github.com/ESIPFed/pygeoweaver"
 
+[tool.poetry.dependencies]
+python = ">=3.7"
+setuptools = ">=61.0"
+requests = "2.28.2"
+
+[tool.poetry.scripts]
