@@ -2,7 +2,7 @@ import subprocess
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_root_dir
 
 
-def export_worklfow(workflow_id, mode, target_file_path):
+def export_workflow(workflow_id, mode, target_file_path):
     """
     Usage: <main class> export workflow [--mode=<export_mode>] <workflow_id>
                                     <target_file_path>
