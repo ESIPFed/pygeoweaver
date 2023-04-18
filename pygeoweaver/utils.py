@@ -3,6 +3,19 @@ import subprocess
 import requests
 import platform
 
+from IPython import get_ipython
+from IPython.display import IFrame
+
+
+def show_web_ui():
+    shell_type = str(get_ipython().__class__.__module__)
+    print(shell_type)
+    if shell_type == "google.colab._shell" or shell_type == "ipykernel.zmqshell":
+        return IFrame(src="http://localhost:8070/Geoweaver/", width='100%', height='500px')
+    else:
+        print('Web UI for python bindings can be only used for Colab / Jupyter / Interactive Python shell')
+
+
 def get_home_dir():
     return os.path.expanduser('~')
 
