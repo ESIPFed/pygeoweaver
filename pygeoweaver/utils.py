@@ -8,6 +8,7 @@ from IPython.display import IFrame
 
 
 def show_web_ui():
+    download_geoweaver_jar()  # check if geoweaver is initialized
     shell_type = str(get_ipython().__class__.__module__)
     print(shell_type)
     if shell_type == "google.colab._shell" or shell_type == "ipykernel.zmqshell":
