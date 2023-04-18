@@ -3,6 +3,19 @@ import subprocess
 import requests
 import platform
 
+from IPython import get_ipython
+from IPython.display import IFrame
+
+
+def ui():
+    download_geoweaver_jar()  # check if geoweaver is initialized
+    shell_type = str(get_ipython().__class__.__module__)
+    if shell_type == "google.colab._shell" or shell_type == "ipykernel.zmqshell":
+        return IFrame(src="http://localhost:8070/Geoweaver/", width='100%', height='500px')
+    else:
+        print('Web UI for python bindings can be only used for Colab / Jupyter / Interactive Python shell')
+
+
 def get_home_dir():
     return os.path.expanduser('~')
 
@@ -28,6 +41,7 @@ def download_geoweaver_jar(overwrite=False):
             subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
             return
 
+    print("Downloading latest version of Geoweaver...")
     geoweaver_url = "https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar"
     r = requests.get(geoweaver_url)
 

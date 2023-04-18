@@ -5,5 +5,4 @@ dist/*
 */*.pyc
 .idea/
 */__pycache__/*
-*.pyc
-*.pyc
+*.ipynb
