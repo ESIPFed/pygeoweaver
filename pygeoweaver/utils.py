@@ -41,6 +41,7 @@ def download_geoweaver_jar(overwrite=False):
             subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
             return
 
+    print("Downloading latest version of Geoweaver...")
     geoweaver_url = "https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar"
     r = requests.get(geoweaver_url)
 
