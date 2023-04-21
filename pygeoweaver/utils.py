@@ -45,7 +45,7 @@ def download_geoweaver_jar(overwrite=False):
         raise RuntimeError("Fail to download geoweaver.jar")
 
 
-def checkOS():
+def check_os():
     if platform.system() == "Linux" or platform == "Linux2":
         return 1
     elif platform.system() == "Darwin":

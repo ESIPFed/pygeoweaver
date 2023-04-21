@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_root_dir
 
