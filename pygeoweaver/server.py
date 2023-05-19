@@ -1,6 +1,7 @@
 import os
 import subprocess
-from pygeoweaver.utils import checkOS, download_geoweaver_jar, get_root_dir
+import webbrowser
+from pygeoweaver.utils import checkIPython, checkOS, download_geoweaver_jar, get_root_dir
 
 """
 This module provides function to start and stop Geoweaver server.
@@ -26,6 +27,12 @@ def stop():
         result = subprocess.run(['./stop.sh'], cwd=f"{get_root_dir()}/", shell=True)
     
 
-
+def show(geoweaver_url = GEOWEAVER_DEFAULT_ENDPOINT_URL):
+    download_geoweaver_jar()  # check if geoweaver is initialized
+    if checkIPython():
+        from IPython.display import IFrame
+        return IFrame(src=geoweaver_url, width='100%', height='500px')
+    else:
+        webbrowser.open(geoweaver_url)
 
 

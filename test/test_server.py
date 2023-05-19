@@ -2,26 +2,28 @@
 The main function of pygeoweaver
 To run in CLI mode. 
 """
-from pygeoweaver import detail_host, detail_process, detail_workflow
-from pygeoweaver import export_workflow
-from pygeoweaver import show_history
-from pygeoweaver import import_workflow
-from pygeoweaver import list_hosts, list_processes, list_workflows
+import requests
 from pygeoweaver import start, stop
 
 import unittest
 
-class Testing(unittest.TestCase):
+from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 
-    def test_main():
-        # start geoweaver
-        #start()
+class TestServer(unittest.TestCase):
+
+    def test_server(self):
+        start()
+        response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL)
+        self.assertEqual(response.status_code, 200, f"Failed to access URL: {url}")
+        stop()
+        response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL)
+        self.assertEqual(response.status_code, 200, f"Failed to access URL: {url}")
         # stop geoweaver
         # stop()
         # list resources
         #list_hosts()
         #list_processes()
-        list_workflows()
+        # list_workflows()
         # show history
         #show_history("ll3u3W78eOEfklxhBJ")
         # detail host
@@ -32,7 +34,7 @@ class Testing(unittest.TestCase):
         # import workflow
         #import_workflow("/Users/joe/Downloads/gr3ykr8dynu12vrwq11oy.zip")
         # export workflow
-        export_workflow("gr3ykr8dynu12vrwq11oy", "4", "/Users/joe/Downloads/test_pygeoweaver_export.zip")
+        # export_workflow("gr3ykr8dynu12vrwq11oy", "4", "/Users/joe/Downloads/test_pygeoweaver_export.zip")
 
 
 if __name__ == "__main__":

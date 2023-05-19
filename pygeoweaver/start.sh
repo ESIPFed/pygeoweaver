@@ -3,6 +3,9 @@
 echo "Stop running Geoweaver if any.."
 pkill -f geoweaver
 
+echo "Check Java.."
+
+
 echo "Start Geoweaver.."
 nohup java -jar ~/geoweaver.jar > ~/geoweaver.log &
 

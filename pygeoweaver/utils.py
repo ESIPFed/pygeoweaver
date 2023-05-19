@@ -2,18 +2,7 @@ import os
 import subprocess
 import requests
 import platform
-
-from IPython import get_ipython
-from IPython.display import IFrame
-
-
-def ui():
-    download_geoweaver_jar()  # check if geoweaver is initialized
-    shell_type = str(get_ipython().__class__.__module__)
-    if shell_type == "google.colab._shell" or shell_type == "ipykernel.zmqshell":
-        return IFrame(src="http://localhost:8070/Geoweaver/", width='100%', height='500px')
-    else:
-        print('Web UI for python bindings can be only used for Colab / Jupyter / Interactive Python shell')
+import sys
 
 
 def get_home_dir():
@@ -62,3 +51,43 @@ def checkOS():
         return 2
     elif platform == "Windows":
         return 3
+
+
+def checkIPython():
+    return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
+
+
+def is_java_installed():
+    try:
+        # Check if Java is installed by running "java -version" command
+        subprocess.run(["java", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return True
+    except FileNotFoundError:
+        return False
+
+def install_java():
+    system = platform.system()
+    if system == "Darwin":
+        # Install Java on MacOS using Homebrew
+        os.system("/bin/bash -c '/usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\"'")
+        os.system("brew install openjdk")
+    elif system == "Linux":
+        # Install Java on Linux using apt package manager
+        os.system("sudo apt update")
+        os.system("sudo apt install -y default-jre default-jdk")
+    elif system == "Windows":
+        # Install Java on Windows using Chocolatey package manager
+        os.system("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))\"")
+        os.system("choco install -y openjdk")
+    else:
+        print("Unsupported operating system.")
+        sys.exit(1)
+
+def checkJava():
+    # Check if Java is installed
+    if is_java_installed():
+        print("Java is already installed.")
+    else:
+        print("Java is not installed. Installing...")
+        install_java()
+        print("Java installation complete.")
