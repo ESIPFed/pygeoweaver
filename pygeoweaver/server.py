@@ -1,6 +1,7 @@
 import os
 import subprocess
 import webbrowser
+from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.utils import checkIPython, checkOS, download_geoweaver_jar, get_root_dir
 
 """
