@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "pytest-cov"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -34,3 +34,6 @@ setuptools = ">=61.0"
 requests = "2.28.2"
 
 [tool.poetry.scripts]
+
+[tool.pytest.ini_options]
+addopts = "-p no:warnings --cov=pygeoweaver --cov-report=html"

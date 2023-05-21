@@ -2,7 +2,7 @@ import os
 import subprocess
 import webbrowser
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
-from pygeoweaver.utils import checkIPython, checkOS, download_geoweaver_jar, get_root_dir
+from pygeoweaver.utils import checkIPython, checkOS, download_geoweaver_jar, get_logger, get_root_dir
 
 """
 This module provides function to start and stop Geoweaver server.
@@ -11,6 +11,7 @@ open Geoweaver GUI in the output cell (if gui is not disabld.)
 
 """
 
+logger = get_logger(__name__)
 
 def start(force=False):
     download_geoweaver_jar(overwrite=force)
@@ -31,9 +32,11 @@ def stop():
 def show(geoweaver_url = GEOWEAVER_DEFAULT_ENDPOINT_URL):
     download_geoweaver_jar()  # check if geoweaver is initialized
     if checkIPython():
+        logger.info("enter ipython block")
         from IPython.display import IFrame
         return IFrame(src=geoweaver_url, width='100%', height='500px')
     else:
+        logger.info("enter self opening block")
         webbrowser.open(geoweaver_url)
 
 

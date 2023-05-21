@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 import requests
@@ -54,7 +55,10 @@ def checkOS():
 
 
 def checkIPython():
-    return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
+    try:
+        return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
+    except:
+        return False
 
 
 def is_java_installed():
@@ -91,3 +95,14 @@ def checkJava():
         print("Java is not installed. Installing...")
         install_java()
         print("Java installation complete.")
+
+
+def get_logger(class_name):
+    logger = logging.getLogger(class_name)
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    return logger
+

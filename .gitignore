@@ -10,3 +10,4 @@ pygeoweaver/__pycache__/__init__.cpython-39.pyc
 pygeoweaver/__pycache__/__main__.cpython-39.pyc
 pygeoweaver/__pycache__/server.cpython-39.pyc
 pygeoweaver/__pycache__/utils.cpython-39.pyc
+.coverage
