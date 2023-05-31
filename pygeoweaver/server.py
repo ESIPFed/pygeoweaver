@@ -2,7 +2,7 @@ import os
 import subprocess
 import webbrowser
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
-from pygeoweaver.utils import checkIPython, checkOS, download_geoweaver_jar, get_logger, get_root_dir
+from pygeoweaver.utils import checkIPython, checkOS, download_geoweaver_jar, get_logger, get_module_absolute_path, get_root_dir
 
 """
 This module provides function to start and stop Geoweaver server.
@@ -18,7 +18,7 @@ def start(force=False):
     if checkOS() == 3:
         raise RuntimeError("windows is not supported yet")
     else:
-        result = subprocess.run(['./start.sh'], cwd=f"{get_root_dir()}/")
+        result = subprocess.run([f'{get_module_absolute_path()}/start.sh'], cwd=f"{get_root_dir()}/")
     
 
 
@@ -26,7 +26,7 @@ def stop():
     if checkOS() == 3:
         raise RuntimeError("Windows is not supported yet")
     else:
-        result = subprocess.run(['./stop.sh'], cwd=f"{get_root_dir()}/", shell=True)
+        result = subprocess.run([f'{get_module_absolute_path()}/stop.sh'], cwd=f"{get_root_dir()}/", shell=True)
     
 
 def show(geoweaver_url = GEOWEAVER_DEFAULT_ENDPOINT_URL):
