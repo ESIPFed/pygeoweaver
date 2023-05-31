@@ -14,6 +14,10 @@ def get_root_dir():
     head, tail = os.path.split(__file__)
     return head
 
+def get_module_absolute_path():
+    module_path = os.path.abspath(__file__)
+    return os.path.dirname(module_path)
+
 
 def get_geoweaver_jar_path():
     return f"{get_home_dir()}/geoweaver.jar"
