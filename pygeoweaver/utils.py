@@ -72,28 +72,45 @@ def is_java_installed():
         # Check if Java is installed by running "java -version" command
         subprocess.run(["java", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
-    except FileNotFoundError:
+    except subprocess.CalledProcessError:
         return False
 
 def install_java():
     system = platform.system()
     if system == "Darwin":
-        # Install Java on MacOS using Homebrew
-        os.system("/bin/bash -c '/usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\"'")
+        os.system(
+            "/bin/bash -c '/usr/bin/ruby -e \"$(curl -fsSL "
+            "https://raw.githubusercontent.com/Homebrew/install/master/install)\"'")
         os.system("brew install openjdk")
     elif system == "Linux":
-        # Install Java on Linux using apt package manager
-        os.system("sudo apt update")
-        os.system("sudo apt install -y default-jre default-jdk")
+        # need to check if the package manager type is apt or yum
+        # arch / debian
+        package_manager = None
+        if os.path.exists("/usr/bin/apt"):
+            package_manager = "apt"
+        elif os.path.exists("/usr/bin/yum"):
+            package_manager = "yum"
+
+        if package_manager:
+            os.system(f"sudo {package_manager} update")
+            os.system(f"sudo {package_manager} install -y default-jre default-jdk")
+        else:
+            print("Package manager not found. Unable to install Java.")
+            sys.exit(1)
     elif system == "Windows":
-        # Install Java on Windows using Chocolatey package manager
-        os.system("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))\"")
+        # note: this requires admin access to the pc, else it will fail saying
+        # Access to the path 'C:\ProgramData\chocolatey\lib-bad' is denied.
+        os.system(
+            "powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; ["
+            "System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object "
+            "System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))\"")
         os.system("choco install -y openjdk")
     else:
         print("Unsupported operating system.")
         sys.exit(1)
 
-def checkJava():
+
+def check_java():
     # Check if Java is installed
     if is_java_installed():
         print("Java is already installed.")
