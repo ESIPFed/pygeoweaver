@@ -4,7 +4,7 @@ To run in CLI mode.
 """
 from pygeoweaver import detail_host, detail_process, detail_workflow, export_workflow, \
     show_history, import_workflow, list_hosts, list_processes, list_workflows, \
-    start, stop, reset_password, run_process, run_worklfow, helpwith, ui
+    start, stop, reset_password, run_process, run_worklfow, helpwith
 from pygeoweaver.server import show
 
 def main():

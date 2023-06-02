@@ -16,6 +16,7 @@ def get_root_dir():
     head, tail = os.path.split(__file__)
     return head
 
+
 def get_module_absolute_path():
     module_path = os.path.abspath(__file__)
     return os.path.dirname(module_path)
@@ -51,7 +52,7 @@ def download_geoweaver_jar(overwrite=False):
         raise RuntimeError("Fail to download geoweaver.jar")
 
 
-def checkOS():
+def check_os():
     if platform.system() == "Linux" or platform == "Linux2":
         return 1
     elif platform.system() == "Darwin":
@@ -60,7 +61,7 @@ def checkOS():
         return 3
 
 
-def checkIPython():
+def check_ipython():
     try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
     except:
@@ -74,6 +75,7 @@ def is_java_installed():
         return True
     except subprocess.CalledProcessError:
         return False
+
 
 def install_java():
     system = platform.system()
@@ -128,4 +130,3 @@ def get_logger(class_name):
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     return logger
-
