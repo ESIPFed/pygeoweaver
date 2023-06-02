@@ -5,6 +5,8 @@ import requests
 import platform
 import sys
 
+from IPython import get_ipython
+
 
 def get_home_dir():
     return os.path.expanduser('~')
