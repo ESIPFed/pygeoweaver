@@ -6,10 +6,12 @@ from pygeoweaver import detail_host, detail_process, detail_workflow, export_wor
     show_history, import_workflow, list_hosts, list_processes, list_workflows, \
     start, stop, reset_password, run_process, run_worklfow, helpwith
 from pygeoweaver.server import show
+from pygeoweaver.utils import check_java
+
 
 def main():
     # start geoweaver
-    start()
+    # start()
     # stop geoweaver
     # stop()
     # list resources
@@ -38,8 +40,9 @@ def main():
 
     # reset localhost password for Geoweaver
     # reset_password()
-    # show()
+    show()
     # helpwith()
+    # check_java()
 
 
 if __name__ == "__main__":
