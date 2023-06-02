@@ -35,8 +35,10 @@ def download_geoweaver_jar(overwrite=False):
         if overwrite:
             os.remove(get_geoweaver_jar_path())
         else:
-            subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
-            return
+            system = platform.system()
+            if not system == "Windows":  # Windows files are exec by default
+                subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
+                return
 
     print("Downloading latest version of Geoweaver...")
     geoweaver_url = "https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar"
@@ -57,7 +59,7 @@ def check_os():
         return 1
     elif platform.system() == "Darwin":
         return 2
-    elif platform == "Windows":
+    elif platform.system() == "Windows":
         return 3
 
 

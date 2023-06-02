@@ -9,7 +9,7 @@ from pygeoweaver.server import show
 
 def main():
     # start geoweaver
-    # start()
+    start()
     # stop geoweaver
     # stop()
     # list resources
@@ -38,7 +38,7 @@ def main():
 
     # reset localhost password for Geoweaver
     # reset_password()
-    show()
+    # show()
     # helpwith()
 
 
