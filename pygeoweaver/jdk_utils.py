@@ -7,6 +7,8 @@ import tarfile
 import zipfile
 import urllib.request
 
+from pygeoweaver.utils import get_home_dir
+
 
 def install_jdk():
     system = platform.system()
@@ -48,13 +50,13 @@ def install_jdk_macos(jdk_version, jdk_arch):
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
-    download_file(jdk_url, 'jdk.tar.gz')
+    download_file(jdk_url, f'{get_home_dir()}/jdk.tar.gz')
 
     # Extract JDK archive
-    extract_tar_archive('jdk.tar.gz', jdk_install_dir)
+    extract_tar_archive(f'{get_home_dir()}/jdk.tar.gz', jdk_install_dir)
 
     # Set JDK environment variables
-    set_jdk_env_vars(jdk_install_dir)
+    set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
 
 
 def install_jdk_linux(jdk_version, jdk_arch):
@@ -68,7 +70,7 @@ def install_jdk_linux(jdk_version, jdk_arch):
     extract_tar_archive('jdk.tar.gz', jdk_install_dir)
 
     # Set JDK environment variables
-    set_jdk_env_vars(jdk_install_dir)
+    set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
 
 
 def install_jdk_windows(jdk_version, jdk_arch):
@@ -82,20 +84,24 @@ def install_jdk_windows(jdk_version, jdk_arch):
     extract_zip_archive('jdk.zip', jdk_install_dir)
 
     # Set JDK environment variables
-    set_jdk_env_vars(jdk_install_dir)
+    set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
 
 
 def download_file(url, filename):
+    if os.path.exists(filename):
+        print(f'{filename} already exists.')
+        return
     print(f'Downloading {filename}...', url)
     urllib.request.urlretrieve(url, filename)
     print(f'{filename} downloaded.')
 
 
 def extract_tar_archive(archive_path, destination_dir):
-    print(f'Extracting {archive_path}...')
-    with tarfile.open(archive_path, 'r:gz') as tar_ref:
-        tar_ref.extractall(destination_dir)
-    print(f'{archive_path} extracted to {destination_dir}.')
+    if not os.path.exists(destination_dir):
+        print(f'Extracting {archive_path}...')
+        with tarfile.open(archive_path, 'r:gz') as tar_ref:
+            tar_ref.extractall(destination_dir)
+        print(f'{archive_path} extracted to {destination_dir}.')
 
 
 def extract_zip_archive(archive_path, destination_dir):
@@ -108,14 +114,9 @@ def extract_zip_archive(archive_path, destination_dir):
 def set_jdk_env_vars(jdk_install_dir):
     print(f'Setting JDK environment variables...')
 
-    # Update PATH environment variable
-    path_var = os.environ.get('PATH', '')
-    jdk_bin_path = os.path.join(jdk_install_dir, 'bin')
-    path_var = f'{jdk_bin_path};{path_var}' if platform.system() == 'Windows' else f'{jdk_bin_path}:{path_var}'
-    os.environ['PATH'] = path_var
-
-    # Update JAVA_HOME environment variable
-    os.environ['JAVA_HOME'] = jdk_install_dir
+    with open(os.path.expanduser("~/.bashrc"), "a") as bashrc:
+        bashrc.write(f'\nexport JAVA_HOME="{jdk_install_dir}"\n')
+        bashrc.write(f'export PATH="$JAVA_HOME/bin:$PATH"\n')
 
     print('JDK environment variables set.')
 
