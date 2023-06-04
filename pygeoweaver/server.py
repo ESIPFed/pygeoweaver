@@ -2,6 +2,7 @@ import os
 import subprocess
 import webbrowser
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
+from pygeoweaver.jdk_utils import check_java
 from pygeoweaver.utils import check_ipython, check_os, download_geoweaver_jar, get_logger, get_module_absolute_path, \
     get_root_dir
 
@@ -17,6 +18,8 @@ logger = get_logger(__name__)
 
 def start(force=False):
     download_geoweaver_jar(overwrite=force)
+    check_java()
+
     if check_os() == 3:
         subprocess.run([f'{get_module_absolute_path()}/start.bat'], cwd=f"{get_root_dir()}/")
     else:
@@ -24,6 +27,7 @@ def start(force=False):
 
 
 def stop():
+    check_java()
     if check_os() == 3:
         subprocess.run([f'{get_module_absolute_path()}/stop.bat'], cwd=f"{get_root_dir()}/", shell=True)
     else:
@@ -32,6 +36,7 @@ def stop():
 
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
     download_geoweaver_jar()  # check if geoweaver is initialized
+    check_java()
     if check_ipython():
         logger.info("enter ipython block")
         from IPython.display import IFrame

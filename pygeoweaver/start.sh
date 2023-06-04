@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Stop running Geoweaver if any.."
-pkill -f geoweaver
+pkill -f geoweaver.jar
 
 echo "Check Java.."
 
