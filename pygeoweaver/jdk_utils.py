@@ -2,6 +2,7 @@ import platform
 import os
 import subprocess
 import shutil
+import sys
 import tarfile
 import zipfile
 import urllib.request
