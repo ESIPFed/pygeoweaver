@@ -85,7 +85,7 @@ def install_jdk_windows(jdk_version, jdk_arch):
 
 
 def download_file(url, filename):
-    print(f'Downloading {filename}...')
+    print(f'Downloading {filename}...', url)
     urllib.request.urlretrieve(url, filename)
     print(f'{filename} downloaded.')
 
