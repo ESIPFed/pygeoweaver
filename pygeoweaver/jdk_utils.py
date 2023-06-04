@@ -54,8 +54,8 @@ def install_jdk_macos():
 
 
 def install_jdk_linux():
-    jdk_version = 'adopt@1.11.0-8'
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/{jdk_version}/OpenJDK11U-jdk_x64_linux_hotspot_{jdk_version.replace("@", "-")}.tar.gz'
+    jdk_version = '1.11.0-8'
+    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version}/OpenJDK11U-jdk_x64_linux_hotspot_{jdk_version.replace("-", "_")}.tar.gz'
 
     jdk_file_name = jdk_url.split('/')[-1]
     jdk_dir_name = jdk_file_name.replace('.tar.gz', '')
