@@ -22,6 +22,7 @@ def install_jdk():
 
     elif system == 'Linux':
         # https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz
+        # https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18_10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz
         if architecture == 'x86_64':
             install_jdk_linux('11.0.18-10', 'jdk_x64_linux_hotspot')
         elif architecture == 'aarch64':
@@ -43,7 +44,7 @@ def install_jdk():
 
 def install_jdk_macos(jdk_version, jdk_arch):
     # jdk_aarch64_linux_hotspot
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
+    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version.replace("-", "%2B")}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
@@ -57,7 +58,7 @@ def install_jdk_macos(jdk_version, jdk_arch):
 
 
 def install_jdk_linux(jdk_version, jdk_arch):
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
+    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version.replace("-", "%2B")}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
@@ -71,7 +72,7 @@ def install_jdk_linux(jdk_version, jdk_arch):
 
 
 def install_jdk_windows(jdk_version, jdk_arch):
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.zip'
+    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version.replace("-", "%2B")}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.zip'
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
