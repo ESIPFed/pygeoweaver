@@ -62,6 +62,7 @@ def install_jdk_linux():
 
     # Download JDK
     print('Downloading JDK...')
+    print('jdk_url: ', jdk_url)
     urllib.request.urlretrieve(jdk_url, jdk_file_name)
 
     # Extract JDK
