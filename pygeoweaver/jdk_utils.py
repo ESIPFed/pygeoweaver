@@ -115,7 +115,7 @@ def is_java_installed():
         # Check if Java is installed by running "java -version" command
         subprocess.run(["java", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
-    except subprocess.CalledProcessError:
+    except:
         return False
 
 
