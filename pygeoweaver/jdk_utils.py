@@ -119,6 +119,7 @@ def set_jdk_env_vars(jdk_install_dir):
         bashrc.write(f'export PATH="$JAVA_HOME/bin:$PATH"\n')
 
     print('JDK environment variables set.')
+    subprocess.run(['bash', '-c', 'source ~/.bashrc'])
 
 
 
