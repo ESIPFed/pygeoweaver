@@ -43,7 +43,7 @@ def install_jdk():
 
 def install_jdk_macos(jdk_version, jdk_arch):
     # jdk_aarch64_linux_hotspot
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
+    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
@@ -57,7 +57,7 @@ def install_jdk_macos(jdk_version, jdk_arch):
 
 
 def install_jdk_linux(jdk_version, jdk_arch):
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
+    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
@@ -71,7 +71,7 @@ def install_jdk_linux(jdk_version, jdk_arch):
 
 
 def install_jdk_windows(jdk_version, jdk_arch):
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.zip'
+    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.zip'
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
