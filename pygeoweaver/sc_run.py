@@ -1,5 +1,5 @@
 import subprocess
-from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_root_dir
+from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
 def run_process(*, process_id: str, host_id: str, password: str, environment: str=None):
@@ -12,7 +12,7 @@ def run_process(*, process_id: str, host_id: str, password: str, environment: st
         environment - optional
     """
     download_geoweaver_jar()
-    subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "process", f"--host={host_id}",
+    subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "process", f"--host={host_id}",
                     f"--password={password}", f"--environment={environment}", process_id],
                    cwd=f"{get_root_dir()}/")
 
@@ -39,7 +39,7 @@ def run_worklfow(*, workflow_id: str, workflow_folder_path: str=None, workflow_z
                            "folder path or zip path")
     
     if workflow_id and not workflow_folder_path and not workflow_zip_file_path:
-        subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
+        subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
                         "-e", environment_list,
                         "-h", host_list,
                         "-p", password_list],
@@ -47,7 +47,7 @@ def run_worklfow(*, workflow_id: str, workflow_folder_path: str=None, workflow_z
 
     if workflow_folder_path and not workflow_zip_file_path:
         # command to run workflow from folder
-        subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
+        subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
                         "-d", workflow_folder_path,
                         "-e", environment_list,
                         "-h", host_list,
@@ -55,7 +55,7 @@ def run_worklfow(*, workflow_id: str, workflow_folder_path: str=None, workflow_z
                        cwd=f"{get_root_dir()}/")
 
     if not workflow_folder_path and workflow_zip_file_path:
-        subprocess.run(["java", "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
+        subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
                         "-e", environment_list,
                         "-f", workflow_zip_file_path,
                         "-h", host_list,

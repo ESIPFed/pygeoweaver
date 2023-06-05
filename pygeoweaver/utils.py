@@ -6,6 +6,26 @@ import platform
 import sys
 
 from IPython import get_ipython
+import os
+import sys
+
+
+def get_java_bin_path():
+    # Check if the 'java' command is available in the system path
+    if sys.platform.startswith('win'):  # Windows
+        java_exe = 'java.exe'
+    else:
+        java_exe = 'java'
+    
+    java_bin_path = None
+    
+    for path in os.environ.get('PATH', '').split(os.pathsep):
+        bin_path = os.path.join(path, java_exe)
+        if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
+            java_bin_path = os.path.dirname(bin_path)
+            break
+    
+    return java_bin_path
 
 
 def get_home_dir():
@@ -15,6 +35,24 @@ def get_home_dir():
 def get_root_dir():
     head, tail = os.path.split(__file__)
     return head
+
+
+def get_java_bin_path():
+    # Check if the 'java' command is available in the system path
+    if sys.platform.startswith('win'):  # Windows
+        java_exe = 'java.exe'
+    else:
+        java_exe = 'java'
+    
+    java_bin_path = None
+    
+    for path in os.environ.get('PATH', '').split(os.pathsep):
+        bin_path = os.path.join(path, java_exe)
+        if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
+            java_bin_path = bin_path
+            break
+    
+    return java_bin_path
 
 
 def get_module_absolute_path():
@@ -68,60 +106,6 @@ def check_ipython():
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
     except:
         return False
-
-
-def is_java_installed():
-    try:
-        # Check if Java is installed by running "java -version" command
-        subprocess.run(["java", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-
-def install_java():
-    system = platform.system()
-    if system == "Darwin":
-        os.system(
-            "/bin/bash -c '/usr/bin/ruby -e \"$(curl -fsSL "
-            "https://raw.githubusercontent.com/Homebrew/install/master/install)\"'")
-        os.system("brew install openjdk")
-    elif system == "Linux":
-        # need to check if the package manager type is apt or yum
-        # arch / debian
-        package_manager = None
-        if os.path.exists("/usr/bin/apt"):
-            package_manager = "apt"
-        elif os.path.exists("/usr/bin/yum"):
-            package_manager = "yum"
-
-        if package_manager:
-            os.system(f"sudo {package_manager} update")
-            os.system(f"sudo {package_manager} install -y default-jre default-jdk")
-        else:
-            print("Package manager not found. Unable to install Java.")
-            sys.exit(1)
-    elif system == "Windows":
-        # note: this requires admin access to the pc, else it will fail saying
-        # Access to the path 'C:\ProgramData\chocolatey\lib-bad' is denied.
-        os.system(
-            "powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; ["
-            "System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object "
-            "System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))\"")
-        os.system("choco install -y openjdk")
-    else:
-        print("Unsupported operating system.")
-        sys.exit(1)
-
-
-def check_java():
-    # Check if Java is installed
-    if is_java_installed():
-        print("Java is already installed.")
-    else:
-        print("Java is not installed. Installing...")
-        install_java()
-        print("Java installation complete.")
 
 
 def get_logger(class_name):
