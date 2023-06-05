@@ -10,23 +10,6 @@ import os
 import sys
 
 
-def get_java_bin_path():
-    # Check if the 'java' command is available in the system path
-    if sys.platform.startswith('win'):  # Windows
-        java_exe = 'java.exe'
-    else:
-        java_exe = 'java'
-    
-    java_bin_path = None
-    
-    for path in os.environ.get('PATH', '').split(os.pathsep):
-        bin_path = os.path.join(path, java_exe)
-        if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
-            java_bin_path = os.path.dirname(bin_path)
-            break
-    
-    return java_bin_path
-
 
 def get_home_dir():
     return os.path.expanduser('~')
@@ -36,21 +19,33 @@ def get_root_dir():
     head, tail = os.path.split(__file__)
     return head
 
+
 def get_java_bin_from_which():
-    # Check if 'which' command is available
-    try:
-        subprocess.check_output(['source', '~/.bashrc', '&&', 'which', 'java'])
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-    
-    # Run 'which java' command to get the Java binary path
-    try:
-        output = subprocess.check_output(['source', '~/.bashrc', '&&', 'which', 'java'], encoding='utf-8')
-        java_bin_path = output.strip()
-    except subprocess.CalledProcessError:
-        return None
+
+    system = platform.system()
+
+    if system == 'Darwin' or system == 'Linux':
+        
+        try:
+            
+            output = subprocess.check_output([f'{get_root_dir()}/java_bin.sh'], encoding='utf-8')
+            
+            java_bin_path = output.strip()
+
+        except subprocess.CalledProcessError:
+            
+            return None
+
+    elif system == 'Windows':
+
+        print('Unsupported platform for windows yet.')
+
+    else:
+        print('Unsupported platform.')
     
     return java_bin_path
+
+
 
 def get_java_bin_path():
     # Check if the 'java' command is available in the system path
