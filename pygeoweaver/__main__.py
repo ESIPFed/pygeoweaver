@@ -14,7 +14,7 @@ def main():
     # stop geoweaver
     # stop()
     # list resources
-    #list_hosts()
+    list_hosts()
     #list_processes()
     # list_workflows()
     # show history
