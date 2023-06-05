@@ -49,7 +49,7 @@ def get_java_bin_path():
     for path in os.environ.get('PATH', '').split(os.pathsep):
         bin_path = os.path.join(path, java_exe)
         if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
-            java_bin_path = os.path.dirname(bin_path)
+            java_bin_path = bin_path
             break
     
     return java_bin_path
