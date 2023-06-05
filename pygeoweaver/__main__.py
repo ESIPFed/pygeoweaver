@@ -15,8 +15,8 @@ def main():
     # stop()
     # list resources
     list_hosts()
-    #list_processes()
-    # list_workflows()
+    list_processes()
+    list_workflows()
     # show history
     #show_history("ll3u3W78eOEfklxhBJ")
     # detail host
