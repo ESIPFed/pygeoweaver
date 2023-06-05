@@ -52,6 +52,7 @@ def get_java_bin_path():
             java_bin_path = bin_path
             break
     
+    print("java_bin_path: ", java_bin_path)
     return java_bin_path
 
 
