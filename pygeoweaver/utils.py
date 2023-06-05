@@ -27,10 +27,14 @@ def get_java_bin_from_which():
     if system == 'Darwin' or system == 'Linux':
         
         try:
-            
-            print("Executing: ", f'{get_root_dir()}/java_bin.sh')
 
-            output = subprocess.check_output([f'{get_root_dir()}/java_bin.sh'], encoding='utf-8')
+            java_bin_sh = f'{get_root_dir()}/java_bin.sh'
+            
+            print("Executing: ", java_bin_sh)
+            
+            os.chmod(java_bin_sh, 0o755)
+
+            output = subprocess.check_output([java_bin_sh], encoding='utf-8')
             
             java_bin_path = output.strip()
 
