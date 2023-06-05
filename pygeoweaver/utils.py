@@ -36,6 +36,21 @@ def get_root_dir():
     head, tail = os.path.split(__file__)
     return head
 
+def get_java_bin_from_which():
+    # Check if 'which' command is available
+    try:
+        subprocess.check_output(['source', '~/.bashrc', '&&', 'which', 'java'])
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    
+    # Run 'which java' command to get the Java binary path
+    try:
+        output = subprocess.check_output(['source', '~/.bashrc', '&&', 'which', 'java'], encoding='utf-8')
+        java_bin_path = output.strip()
+    except subprocess.CalledProcessError:
+        return None
+    
+    return java_bin_path
 
 def get_java_bin_path():
     # Check if the 'java' command is available in the system path
@@ -52,6 +67,10 @@ def get_java_bin_path():
             java_bin_path = bin_path
             break
     
+    if java_bin_path is None:
+        java_bin_path = get_java_bin_from_which()
+
+    print("java_bin_path: ", java_bin_path)
     return java_bin_path
 
 
