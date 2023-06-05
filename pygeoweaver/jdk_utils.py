@@ -124,7 +124,7 @@ def set_jdk_env_vars(jdk_install_dir):
         
     if not check_java:
         with open(os.path.expanduser("~/.bashrc"), "a") as bashrc:
-            bashrc.write()
+            bashrc.write(f'\nexport JAVA_HOME="{jdk_install_dir}"\n')
             bashrc.write(f'export PATH="$JAVA_HOME/bin:$PATH"\n')
             print('JDK environment variables set.')
 
