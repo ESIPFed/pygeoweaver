@@ -5,6 +5,11 @@ import requests
 import platform
 import sys
 
+from IPython import get_ipython
+import os
+import sys
+
+
 
 def get_home_dir():
     return os.path.expanduser('~')
@@ -13,6 +18,60 @@ def get_home_dir():
 def get_root_dir():
     head, tail = os.path.split(__file__)
     return head
+
+
+def get_java_bin_from_which():
+
+    system = platform.system()
+
+    if system == 'Darwin' or system == 'Linux':
+        
+        try:
+            
+            output = subprocess.check_output([f'{get_root_dir()}/java_bin.sh'], encoding='utf-8')
+            
+            java_bin_path = output.strip()
+
+        except subprocess.CalledProcessError:
+            
+            return None
+
+    elif system == 'Windows':
+
+        print('Unsupported platform for windows yet.')
+
+    else:
+        print('Unsupported platform.')
+    
+    return java_bin_path
+
+
+
+def get_java_bin_path():
+    # Check if the 'java' command is available in the system path
+    if sys.platform.startswith('win'):  # Windows
+        java_exe = 'java.exe'
+    else:
+        java_exe = 'java'
+    
+    java_bin_path = None
+    
+    for path in os.environ.get('PATH', '').split(os.pathsep):
+        bin_path = os.path.join(path, java_exe)
+        if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
+            java_bin_path = bin_path
+            break
+    
+    if java_bin_path is None:
+        java_bin_path = get_java_bin_from_which()
+
+    print("java_bin_path: ", java_bin_path)
+    return java_bin_path
+
+
+def get_module_absolute_path():
+    module_path = os.path.abspath(__file__)
+    return os.path.dirname(module_path)
 
 
 def get_geoweaver_jar_path():
@@ -28,8 +87,10 @@ def download_geoweaver_jar(overwrite=False):
         if overwrite:
             os.remove(get_geoweaver_jar_path())
         else:
-            subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
-            return
+            system = platform.system()
+            if not system == "Windows":  # Windows files are exec by default
+                subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
+                return
 
     print("Downloading latest version of Geoweaver...")
     geoweaver_url = "https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar"
@@ -50,51 +111,15 @@ def check_os():
         return 1
     elif platform.system() == "Darwin":
         return 2
-    elif platform == "Windows":
+    elif platform.system() == "Windows":
         return 3
 
 
-def checkIPython():
+def check_ipython():
     try:
         return get_ipython().__class__.__name__ == "ZMQInteractiveShell"
     except:
         return False
-
-
-def is_java_installed():
-    try:
-        # Check if Java is installed by running "java -version" command
-        subprocess.run(["java", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return True
-    except FileNotFoundError:
-        return False
-
-def install_java():
-    system = platform.system()
-    if system == "Darwin":
-        # Install Java on MacOS using Homebrew
-        os.system("/bin/bash -c '/usr/bin/ruby -e \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)\"'")
-        os.system("brew install openjdk")
-    elif system == "Linux":
-        # Install Java on Linux using apt package manager
-        os.system("sudo apt update")
-        os.system("sudo apt install -y default-jre default-jdk")
-    elif system == "Windows":
-        # Install Java on Windows using Chocolatey package manager
-        os.system("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))\"")
-        os.system("choco install -y openjdk")
-    else:
-        print("Unsupported operating system.")
-        sys.exit(1)
-
-def checkJava():
-    # Check if Java is installed
-    if is_java_installed():
-        print("Java is already installed.")
-    else:
-        print("Java is not installed. Installing...")
-        install_java()
-        print("Java installation complete.")
 
 
 def get_logger(class_name):
@@ -105,4 +130,3 @@ def get_logger(class_name):
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     return logger
-
