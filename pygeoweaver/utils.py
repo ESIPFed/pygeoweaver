@@ -28,11 +28,15 @@ def get_java_bin_from_which():
         
         try:
             
+            print("Executing: ", f'{get_root_dir()}/java_bin.sh')
+
             output = subprocess.check_output([f'{get_root_dir()}/java_bin.sh'], encoding='utf-8')
             
             java_bin_path = output.strip()
 
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+
+            print(f"Command execution failed: {e.output}")
             
             return None
 

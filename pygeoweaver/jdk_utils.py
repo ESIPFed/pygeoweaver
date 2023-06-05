@@ -113,12 +113,21 @@ def extract_zip_archive(archive_path, destination_dir):
 
 def set_jdk_env_vars(jdk_install_dir):
     print(f'Setting JDK environment variables...')
+    java_line = f'\nexport JAVA_HOME="{jdk_install_dir}"\n'
 
-    with open(os.path.expanduser("~/.bashrc"), "a") as bashrc:
-        bashrc.write(f'\nexport JAVA_HOME="{jdk_install_dir}"\n')
-        bashrc.write(f'export PATH="$JAVA_HOME/bin:$PATH"\n')
+    check_java = False
+    with open(os.path.expanduser("~/.bashrc"), 'r') as file:
+        for line in file:
+            if line.strip() == java_line:
+                check_java = True
+                break
+        
+    if not check_java:
+        with open(os.path.expanduser("~/.bashrc"), "a") as bashrc:
+            bashrc.write(f'\nexport JAVA_HOME="{jdk_install_dir}"\n')
+            bashrc.write(f'export PATH="$JAVA_HOME/bin:$PATH"\n')
+            print('JDK environment variables set.')
 
-    print('JDK environment variables set.')
     subprocess.run(['bash', '-c', 'source ~/.bashrc'])
 
 
