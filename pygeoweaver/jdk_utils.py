@@ -7,7 +7,7 @@ import tarfile
 import zipfile
 import urllib.request
 
-from pygeoweaver.utils import get_home_dir
+from pygeoweaver.utils import get_home_dir, get_java_bin_path
 
 
 def install_jdk():
@@ -162,7 +162,7 @@ def install_java():
 def is_java_installed():
     try:
         # Check if Java is installed by running "java -version" command
-        subprocess.run(["java", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run([get_java_bin_path(), "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
     except:
         return False

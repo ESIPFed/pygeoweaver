@@ -6,6 +6,26 @@ import platform
 import sys
 
 from IPython import get_ipython
+import os
+import sys
+
+
+def get_java_bin_path():
+    # Check if the 'java' command is available in the system path
+    if sys.platform.startswith('win'):  # Windows
+        java_exe = 'java.exe'
+    else:
+        java_exe = 'java'
+    
+    java_bin_path = None
+    
+    for path in os.environ.get('PATH', '').split(os.pathsep):
+        bin_path = os.path.join(path, java_exe)
+        if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
+            java_bin_path = os.path.dirname(bin_path)
+            break
+    
+    return java_bin_path
 
 
 def get_home_dir():
@@ -16,6 +36,20 @@ def get_root_dir():
     head, tail = os.path.split(__file__)
     return head
 
+def get_java_bin_path():
+    # Get the JAVA_HOME environment variable
+    java_home = os.environ.get('JAVA_HOME')
+    
+    if java_home:
+        # Append 'bin' to the JAVA_HOME path
+        java_bin_path = os.path.join(java_home, 'bin')
+        
+        # Check if the 'bin' directory exists
+        if os.path.isdir(java_bin_path):
+            return java_bin_path
+    
+    # If JAVA_HOME is not set or 'bin' directory doesn't exist, return None
+    return None
 
 def get_module_absolute_path():
     module_path = os.path.abspath(__file__)
