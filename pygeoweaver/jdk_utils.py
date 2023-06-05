@@ -23,8 +23,6 @@ def install_jdk():
             print('Unsupported architecture.')
 
     elif system == 'Linux':
-        # https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz
-        # https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18_10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz
         if architecture == 'x86_64':
             install_jdk_linux('11.0.18-10', 'jdk_x64_linux_hotspot')
         elif architecture == 'aarch64':
