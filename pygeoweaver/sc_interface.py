@@ -11,3 +11,4 @@ from pygeoweaver.sc_run import *
 from pygeoweaver.server import *
 from pygeoweaver.sc_resetpassword import *
 from pygeoweaver.sc_help import *
+from pygeoweaver.constants import *
