@@ -1,7 +1,7 @@
 import subprocess
-from constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 import requests
 
+from pygeoweaver import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
