@@ -1,7 +1,7 @@
 import subprocess
 import requests
 
-from pygeoweaver import GEOWEAVER_DEFAULT_ENDPOINT_URL
+from . import constants
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
@@ -23,7 +23,7 @@ def get_process_history(process_id):
     """
     if not process_id:
         raise Exception("please pass `process_id` as a parameter to the function.")
-    r = requests.post(f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs", data={'type': 'process', 'id': process_id}).json()
+    r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs", data={'type': 'process', 'id': process_id}).json()
     return r
 
 
@@ -34,5 +34,5 @@ def get_workflow_history(workflow_id):
     """
     if not workflow_id:
         raise Exception("please pass `workflow_id` as a parameter to the function.")
-    r = requests.get(f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs", data={'type': 'workflow', 'id': workflow_id}).json()
+    r = requests.get(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs", data={'type': 'workflow', 'id': workflow_id}).json()
     return r
