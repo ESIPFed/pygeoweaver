@@ -23,8 +23,14 @@ def get_process_history(process_id):
     """
     if not process_id:
         raise Exception("please pass `process_id` as a parameter to the function.")
-    r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs", data={'type': 'process', 'id': process_id}).json()
-    return r
+    download_geoweaver_jar()
+    try:
+        subprocess.run(f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} process-history {process_id}",
+                       cwd=f"{get_root_dir()}/", shell=True)
+    except subprocess.CalledProcessError as e:
+        r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
+                          data={'type': 'process', 'id': process_id}).json()
+        return r
 
 
 def get_workflow_history(workflow_id):
@@ -34,5 +40,10 @@ def get_workflow_history(workflow_id):
     """
     if not workflow_id:
         raise Exception("please pass `workflow_id` as a parameter to the function.")
-    r = requests.get(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs", data={'type': 'workflow', 'id': workflow_id}).json()
-    return r
+    try:
+        subprocess.run(f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} workflow-history {workflow_id}",
+                       shell=True, cwd=f"{get_root_dir()}/")
+    except subprocess.CalledProcessError as e:
+        r = requests.get(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
+                         data={'type': 'workflow', 'id': workflow_id}).json()
+        return r
