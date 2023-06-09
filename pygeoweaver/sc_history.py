@@ -43,7 +43,7 @@ def get_workflow_history(workflow_id):
     if not workflow_id:
         raise Exception("please pass `workflow_id` as a parameter to the function.")
     try:
-        r = requests.get(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
+        r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
                          data={'type': 'workflow', 'id': workflow_id}).json()
         return pd.DataFrame(r)
     except Exception as e:
