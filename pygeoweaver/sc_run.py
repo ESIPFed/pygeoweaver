@@ -1,5 +1,10 @@
+import json
 import os
 import subprocess
+
+import requests
+
+from . import constants
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
@@ -16,7 +21,8 @@ def create_workflow():
     pass
 
 
-def run_process(*, process_id: str, host_id: str, password: str, environment: str = None):
+def run_process(*, process_id: str, host_id: str, password: str, environment: str = None,
+                sync_path: os.PathLike = None):
     """
     Run a process
 
@@ -25,6 +31,35 @@ def run_process(*, process_id: str, host_id: str, password: str, environment: st
         password - required
         environment - optional
     """
+    if sync_path:
+        ext, matching_dict = None, None
+        process_file = os.path.exists(os.path.join(sync_path, 'code', 'process.json'))
+        if not process_file:
+            print("process file does not exists, please check the path")
+            return
+        p_file = json.loads(open(os.path.join(sync_path, 'code', 'process.json'), "r").read())
+        for item in p_file:
+            if item.get("id") == process_id:
+                matching_dict = item
+                break
+        if not matching_dict:
+            print("Could not find the file, please check the path")
+            return
+        if matching_dict['lang'] == "python":
+            ext = ".py"
+        if matching_dict['lang'] == "bash":
+            ext = ".bash"
+        if not ext:
+            print("Invalid file format.")
+        source_filename = matching_dict['name'] + ext
+        source_file_exists = os.path.exists(os.path.join(sync_path, 'code', source_filename))
+        if source_file_exists:
+            f = open(os.path.join(sync_path, 'code', source_filename), "r").read()
+            matching_dict['code'] = f
+            requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+                              data=json.dumps(matching_dict), headers={'Content-Type': 'application/json'})
+        else:
+            print("File does not exists")
     download_geoweaver_jar()
     subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "process", f"--host={host_id}",
                     f"--password={password}", f"--environment={environment}", process_id],
