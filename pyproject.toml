@@ -32,6 +32,7 @@ homepage = "https://github.com/ESIPFed/pygeoweaver"
 python = ">=3.7"
 setuptools = ">=61.0"
 requests = "2.28.2"
+pydantic = "1.10.9"
 
 [tool.poetry.scripts]
 
