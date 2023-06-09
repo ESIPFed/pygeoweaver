@@ -14,8 +14,7 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
     download_geoweaver_jar()
     # download workflow
     r = requests.post(f'{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/downloadworkflow',
-                      data={'id': workflow_id, 'option': 'workflowwithprocesscodeallhistory'},
-                      headers=constants.COMMON_API_HEADER).text
+                      data={'id': workflow_id, 'option': 'workflowwithprocesscodeallhistory'}).text
     filename = r.rsplit('/')[-1]
     home_dir = os.path.expanduser("~")
     tmp_dir = os.path.join(home_dir, 'tmp')
@@ -28,7 +27,7 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
     if not sync_to_path:
         raise Exception("Please provide path to workflow that you wish to sync code and history")
     import_id = json.loads(open(os.path.join(home_dir, 'tmp', 'workflow.json'), "r").read()).get("id")
-    sync_id = json.loads(open(sync_to_path, "r").read()).get("id")
+    sync_id = json.loads(open(os.path.join(sync_to_path, "workflow.json"), "r").read()).get("id")
 
     if import_id == sync_id:
         # if they match perform file replace
