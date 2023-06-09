@@ -69,6 +69,29 @@ def create_process(lang, description, name, code, owner="111111", confidential=F
         return r.json()
 
 
+def create_process_from_file(lang, description, name, file_path, owner="111111", confidential=False):
+    """
+    Function to create a process with code from a file.
+    :param lang: The programming language of the process.
+    :type lang: str
+    :param description: The description of the process.
+    :type description: str
+    :param name: The name of the process.
+    :type name: str
+    :param file_path: The path to the file containing the code.
+    :type file_path: str
+    :param owner: The owner of the process, defaults to "111111".
+    :type owner: str, optional
+    :param confidential: The confidentiality status of the process, defaults to False.
+    :type confidential: bool, optional
+    :return: Returns the id of the created process.
+    :rtype: dict
+    """
+    with open(file_path, 'r') as file:
+        code = file.read()
+    return create_process(lang, description, name, code, owner=owner, confidential=confidential)
+
+
 def create_workflow(description, edges, name, nodes, owner="111111", confidential=False):
     """
         Function to create a workflow with given data if valid
