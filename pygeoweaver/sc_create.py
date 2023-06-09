@@ -1,9 +1,12 @@
 import json
 import requests
+from IPython.core.display_functions import display
+from ipywidgets import widgets
 from pydantic import BaseModel
 
 from . import constants
-from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
+from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir, \
+    check_ipython
 
 
 class ProcessData(BaseModel):
@@ -60,7 +63,17 @@ def create_process(lang, description, name, code, owner="111111", confidential=F
         data=data_json,
         headers=constants.COMMON_API_HEADER
     )
-    return r.json()
+    if check_ipython() and r.ok:
+        data = json.loads(data_json)
+        header_labels = ['Key', 'Value']
+        header_widgets = [widgets.Label(value=label) for label in header_labels]
+        row_widgets = [widgets.Label(value=str(item)) for item in data.items()]
+        grid = widgets.GridBox(header_widgets + row_widgets,
+                               layout=widgets.Layout(grid_template_columns="repeat(2, auto)"))
+        grid.layout.border = '1px solid black'
+        display(grid)
+    else:
+        return r.json()
 
 
 def create_workflow(description, edges, name, nodes, owner="111111", confidential=False):
@@ -97,4 +110,7 @@ def create_workflow(description, edges, name, nodes, owner="111111", confidentia
         data=data_json,
         headers=constants.COMMON_API_HEADER
     )
-    return r.json()
+    if check_ipython():
+        pass
+    else:
+        return r.json()
