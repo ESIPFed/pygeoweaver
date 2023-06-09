@@ -11,6 +11,7 @@ from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, ge
 
 
 def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]):
+    download_geoweaver_jar()
     # download workflow
     r = requests.post(f'{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/downloadworkflow',
                       data={'id': workflow_id, 'option': 'workflowwithprocesscodeallhistory'},
