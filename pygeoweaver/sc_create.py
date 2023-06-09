@@ -1,7 +1,6 @@
 import json
 import requests
-from IPython.core.display_functions import display
-from ipywidgets import widgets
+import pandas as pd
 from pydantic import BaseModel
 
 from . import constants
@@ -64,14 +63,8 @@ def create_process(lang, description, name, code, owner="111111", confidential=F
         headers=constants.COMMON_API_HEADER
     )
     if check_ipython() and r.ok:
-        data = json.loads(data_json)
-        header_labels = ['Key', 'Value']
-        header_widgets = [widgets.Label(value=label) for label in header_labels]
-        row_widgets = [widgets.Label(value=str(item)) for item in data.items()]
-        grid = widgets.GridBox(header_widgets + row_widgets,
-                               layout=widgets.Layout(grid_template_columns="repeat(2, auto)"))
-        grid.layout.border = '1px solid black'
-        display(grid)
+        df = pd.DataFrame(json.loads(data_json).items(), columns=['Key', 'Value'])
+        return df
     else:
         return r.json()
 
@@ -111,6 +104,6 @@ def create_workflow(description, edges, name, nodes, owner="111111", confidentia
         headers=constants.COMMON_API_HEADER
     )
     if check_ipython():
-        pass
+        return pd.DataFrame(json.loads(data_json).items(), columns=['Key', 'Value'])
     else:
         return r.json()
