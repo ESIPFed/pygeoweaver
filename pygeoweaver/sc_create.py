@@ -55,7 +55,7 @@ def create_process(lang, description, name, code, owner="111111", confidential=F
         confidential=confidential
     )
     data_json = process.json()
-    r = requests.get(
+    r = requests.post(
         f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/process",
         data=data_json,
         headers=constants.COMMON_API_HEADER
@@ -92,7 +92,7 @@ def create_workflow(description, edges, name, nodes, owner="111111", confidentia
         owner=owner
     )
     data_json = workflow.json()
-    r = requests.get(
+    r = requests.post(
         f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/workflow",
         data=data_json,
         headers=constants.COMMON_API_HEADER
