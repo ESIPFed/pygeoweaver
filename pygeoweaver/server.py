@@ -3,8 +3,14 @@ import subprocess
 import webbrowser
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.jdk_utils import check_java
-from pygeoweaver.utils import check_ipython, check_os, download_geoweaver_jar, get_logger, get_module_absolute_path, \
-    get_root_dir
+from pygeoweaver.utils import (
+    check_ipython,
+    check_os,
+    download_geoweaver_jar,
+    get_logger,
+    get_module_absolute_path,
+    get_root_dir,
+)
 
 """
 This module provides function to start and stop Geoweaver server.
@@ -21,17 +27,29 @@ def start(force=False):
     check_java()
 
     if check_os() == 3:
-        subprocess.run([f'{get_module_absolute_path()}/start.bat'], cwd=f"{get_root_dir()}/")
+        subprocess.run(
+            [f"{get_module_absolute_path()}/start.bat"], cwd=f"{get_root_dir()}/"
+        )
     else:
-        subprocess.run([f'{get_module_absolute_path()}/start.sh'], cwd=f"{get_root_dir()}/")
+        subprocess.run(
+            [f"{get_module_absolute_path()}/start.sh"], cwd=f"{get_root_dir()}/"
+        )
 
 
 def stop():
     check_java()
     if check_os() == 3:
-        subprocess.run([f'{get_module_absolute_path()}/stop.bat'], cwd=f"{get_root_dir()}/", shell=True)
+        subprocess.run(
+            [f"{get_module_absolute_path()}/stop.bat"],
+            cwd=f"{get_root_dir()}/",
+            shell=True,
+        )
     else:
-        subprocess.run([f'{get_module_absolute_path()}/stop.sh'], cwd=f"{get_root_dir()}/", shell=True)
+        subprocess.run(
+            [f"{get_module_absolute_path()}/stop.sh"],
+            cwd=f"{get_root_dir()}/",
+            shell=True,
+        )
 
 
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
@@ -40,7 +58,8 @@ def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
     if check_ipython():
         logger.info("enter ipython block")
         from IPython.display import IFrame
-        return IFrame(src=geoweaver_url, width='100%', height='500px')
+
+        return IFrame(src=geoweaver_url, width="100%", height="500px")
     else:
         logger.info("enter self opening block")
         webbrowser.open(geoweaver_url)

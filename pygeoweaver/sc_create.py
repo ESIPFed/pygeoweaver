@@ -4,8 +4,13 @@ import pandas as pd
 from pydantic import BaseModel
 
 from . import constants
-from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir, \
-    check_ipython
+from pygeoweaver.utils import (
+    download_geoweaver_jar,
+    get_geoweaver_jar_path,
+    get_java_bin_path,
+    get_root_dir,
+    check_ipython,
+)
 
 
 class ProcessData(BaseModel):
@@ -54,22 +59,24 @@ def create_process(lang, description, name, code, owner="111111", confidential=F
         name=name,
         code=code,
         owner=owner,
-        confidential=confidential
+        confidential=confidential,
     )
     data_json = process.json()
     r = requests.post(
         f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/process",
         data=data_json,
-        headers=constants.COMMON_API_HEADER
+        headers=constants.COMMON_API_HEADER,
     )
     if check_ipython() and r.ok:
-        df = pd.DataFrame(json.loads(data_json).items(), columns=['Key', 'Value'])
+        df = pd.DataFrame(json.loads(data_json).items(), columns=["Key", "Value"])
         return df
     else:
         return r.json()
 
 
-def create_process_from_file(lang, description, name, file_path, owner="111111", confidential=False):
+def create_process_from_file(
+    lang, description, name, file_path, owner="111111", confidential=False
+):
     """
     Function to create a process with code from a file.
     :param lang: The programming language of the process.
@@ -87,12 +94,16 @@ def create_process_from_file(lang, description, name, file_path, owner="111111",
     :return: Returns the id of the created process.
     :rtype: dict
     """
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         code = file.read()
-    return create_process(lang, description, name, code, owner=owner, confidential=confidential)
+    return create_process(
+        lang, description, name, code, owner=owner, confidential=confidential
+    )
 
 
-def create_workflow(description, edges, name, nodes, owner="111111", confidential=False):
+def create_workflow(
+    description, edges, name, nodes, owner="111111", confidential=False
+):
     """
         Function to create a workflow with given data if valid
     :param confidential: The confidentiality status of the workflow, defaults to False
@@ -118,15 +129,15 @@ def create_workflow(description, edges, name, nodes, owner="111111", confidentia
         edges=edges,
         name=name,
         nodes=nodes,
-        owner=owner
+        owner=owner,
     )
     data_json = workflow.json()
     r = requests.post(
         f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/workflow",
         data=data_json,
-        headers=constants.COMMON_API_HEADER
+        headers=constants.COMMON_API_HEADER,
     )
     if check_ipython():
-        return pd.DataFrame(json.loads(data_json).items(), columns=['Key', 'Value'])
+        return pd.DataFrame(json.loads(data_json).items(), columns=["Key", "Value"])
     else:
         return r.json()

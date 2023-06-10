@@ -4,7 +4,12 @@ import pandas as pd
 import requests
 
 from . import constants
-from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
+from pygeoweaver.utils import (
+    download_geoweaver_jar,
+    get_geoweaver_jar_path,
+    get_java_bin_path,
+    get_root_dir,
+)
 
 
 def show_history(history_id):
@@ -14,8 +19,10 @@ def show_history(history_id):
     if not history_id:
         raise RuntimeError("history id is missing")
     download_geoweaver_jar()
-    subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "history", history_id],
-                   cwd=f"{get_root_dir()}/")
+    subprocess.run(
+        [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "history", history_id],
+        cwd=f"{get_root_dir()}/",
+    )
 
 
 def get_process_history(process_id):
@@ -27,12 +34,17 @@ def get_process_history(process_id):
         raise Exception("please pass `process_id` as a parameter to the function.")
     download_geoweaver_jar()
     try:
-        r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
-                          data={'type': 'process', 'id': process_id}).json()
+        r = requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
+            data={"type": "process", "id": process_id},
+        ).json()
         return pd.DataFrame(r)
     except Exception as e:
-        subprocess.run(f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} process-history {process_id}",
-                       cwd=f"{get_root_dir()}/", shell=True)
+        subprocess.run(
+            f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} process-history {process_id}",
+            cwd=f"{get_root_dir()}/",
+            shell=True,
+        )
 
 
 def get_workflow_history(workflow_id):
@@ -43,9 +55,14 @@ def get_workflow_history(workflow_id):
     if not workflow_id:
         raise Exception("please pass `workflow_id` as a parameter to the function.")
     try:
-        r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
-                          data={'type': 'workflow', 'id': workflow_id}).json()
+        r = requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
+            data={"type": "workflow", "id": workflow_id},
+        ).json()
         return pd.DataFrame(r)
     except Exception as e:
-        subprocess.run(f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} workflow-history {workflow_id}",
-                       shell=True, cwd=f"{get_root_dir()}/")
+        subprocess.run(
+            f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} workflow-history {workflow_id}",
+            shell=True,
+            cwd=f"{get_root_dir()}/",
+        )
