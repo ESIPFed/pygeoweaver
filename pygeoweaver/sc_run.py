@@ -8,19 +8,6 @@ from . import constants
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
-def create_process():
-    pass
-
-
-def create_workflow():
-    """
-        Create workflow from workflow.json
-    :return:
-    :rtype:
-    """
-    pass
-
-
 def run_process(*, process_id: str, host_id: str, password: str, environment: str = None,
                 sync_path: os.PathLike = None):
     """
