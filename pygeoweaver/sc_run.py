@@ -4,7 +4,7 @@ import subprocess
 
 import requests
 
-from . import constants, sync_workflow
+from . import constants
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
@@ -86,6 +86,7 @@ def run_workflow(*, workflow_id: str, workflow_folder_path: str = None, workflow
     download_geoweaver_jar()
 
     if sync_path:
+        from . import sync_workflow
         sync_workflow(workflow_id=workflow_id, sync_to_path=sync_path)
 
     if not workflow_id and not workflow_folder_path and not workflow_zip_file_path:
