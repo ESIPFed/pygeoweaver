@@ -4,7 +4,7 @@ import subprocess
 
 import requests
 
-from . import constants
+from . import constants, sync_workflow
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
@@ -57,7 +57,7 @@ def run_process(*, process_id: str, host_id: str, password: str, environment: st
             f = open(os.path.join(sync_path, 'code', source_filename), "r").read()
             matching_dict['code'] = f
             requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
-                              data=json.dumps(matching_dict), headers={'Content-Type': 'application/json'})
+                          data=json.dumps(matching_dict), headers={'Content-Type': 'application/json'})
         else:
             print("File does not exists")
     download_geoweaver_jar()
@@ -67,7 +67,8 @@ def run_process(*, process_id: str, host_id: str, password: str, environment: st
 
 
 def run_workflow(*, workflow_id: str, workflow_folder_path: str = None, workflow_zip_file_path: str = None,
-                 environment_list: str = None, host_list: str = None, password_list: str = None):
+                 environment_list: str = None, host_list: str = None, password_list: str = None,
+                 sync_path: os.PathLike = None):
     """
     Usage: <main class> run workflow [-d=<workflowFolderPath>]
                                     [-f=<workflowZipPath>] [-e=<envs>]...
@@ -83,6 +84,9 @@ def run_workflow(*, workflow_id: str, workflow_folder_path: str = None, workflow
     -p, --passwords=<passes>   passwords to the target hosts. list of passwords with comma as separator. 
     """
     download_geoweaver_jar()
+
+    if sync_path:
+        sync_workflow(workflow_id=workflow_id, sync_to_path=sync_path)
 
     if not workflow_id and not workflow_folder_path and not workflow_zip_file_path:
         raise RuntimeError("Please provide at least one of the three options: workflow id, "
@@ -109,4 +113,3 @@ def run_workflow(*, workflow_id: str, workflow_folder_path: str = None, workflow
             command.extend(["-e", environment_list])
         command.extend(["-f", workflow_zip_file_path, "-h", host_list, "-p", password_list])
         subprocess.run(command, cwd=f"{get_root_dir()}/")
-
