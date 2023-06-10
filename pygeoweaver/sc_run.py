@@ -1,8 +1,28 @@
+import json
+import os
 import subprocess
+
+import requests
+
+from . import constants
 from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
 
 
-def run_process(*, process_id: str, host_id: str, password: str, environment: str=None):
+def create_process():
+    pass
+
+
+def create_workflow():
+    """
+        Create workflow from workflow.json
+    :return:
+    :rtype:
+    """
+    pass
+
+
+def run_process(*, process_id: str, host_id: str, password: str, environment: str = None,
+                sync_path: os.PathLike = None):
     """
     Run a process
 
@@ -11,13 +31,44 @@ def run_process(*, process_id: str, host_id: str, password: str, environment: st
         password - required
         environment - optional
     """
+    if sync_path:
+        ext, matching_dict = None, None
+        process_file = os.path.exists(os.path.join(sync_path, 'code', 'process.json'))
+        if not process_file:
+            print("process file does not exists, please check the path")
+            return
+        p_file = json.loads(open(os.path.join(sync_path, 'code', 'process.json'), "r").read())
+        for item in p_file:
+            if item.get("id") == process_id:
+                matching_dict = item
+                break
+        if not matching_dict:
+            print("Could not find the file, please check the path")
+            return
+        if matching_dict['lang'] == "python":
+            ext = ".py"
+        if matching_dict['lang'] == "bash":
+            ext = ".bash"
+        if not ext:
+            print("Invalid file format.")
+        source_filename = matching_dict['name'] + ext
+        source_file_exists = os.path.exists(os.path.join(sync_path, 'code', source_filename))
+        if source_file_exists:
+            f = open(os.path.join(sync_path, 'code', source_filename), "r").read()
+            matching_dict['code'] = f
+            requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+                          data=json.dumps(matching_dict), headers={'Content-Type': 'application/json'})
+        else:
+            print("File does not exists")
     download_geoweaver_jar()
     subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "process", f"--host={host_id}",
                     f"--password={password}", f"--environment={environment}", process_id],
                    cwd=f"{get_root_dir()}/")
 
-def run_worklfow(*, workflow_id: str, workflow_folder_path: str=None, workflow_zip_file_path: str=None, 
-                 environment_list: str=None, host_list: str, password_list: str):
+
+def run_workflow(*, workflow_id: str, workflow_folder_path: str = None, workflow_zip_file_path: str = None,
+                 environment_list: str = None, host_list: str = None, password_list: str = None,
+                 sync_path: os.PathLike = None):
     """
     Usage: <main class> run workflow [-d=<workflowFolderPath>]
                                     [-f=<workflowZipPath>] [-e=<envs>]...
@@ -34,31 +85,32 @@ def run_worklfow(*, workflow_id: str, workflow_folder_path: str=None, workflow_z
     """
     download_geoweaver_jar()
 
+    if sync_path:
+        from . import sync_workflow
+        sync_workflow(workflow_id=workflow_id, sync_to_path=sync_path)
+
     if not workflow_id and not workflow_folder_path and not workflow_zip_file_path:
-        raise RuntimeError("Please provide at least one of the three options: workflow id, " \
+        raise RuntimeError("Please provide at least one of the three options: workflow id, "
                            "folder path or zip path")
-    
+
     if workflow_id and not workflow_folder_path and not workflow_zip_file_path:
-        subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
-                        "-e", environment_list,
-                        "-h", host_list,
-                        "-p", password_list],
-                       cwd=f"{get_root_dir()}/")
+        command = [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id]
+        if environment_list:
+            command.extend(["-e", environment_list])
+        command.extend(["-h", host_list, "-p", password_list])
+        subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if workflow_folder_path and not workflow_zip_file_path:
         # command to run workflow from folder
-        subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
-                        "-d", workflow_folder_path,
-                        "-e", environment_list,
-                        "-h", host_list,
-                        "-p", password_list],
-                       cwd=f"{get_root_dir()}/")
+        command = [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id]
+        if environment_list:
+            command.extend(["-e", environment_list])
+        command.extend(["-d", workflow_folder_path, "-h", host_list, "-p", password_list])
+        subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if not workflow_folder_path and workflow_zip_file_path:
-        subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
-                        "-e", environment_list,
-                        "-f", workflow_zip_file_path,
-                        "-h", host_list,
-                        "-p", password_list],
-                       cwd=f"{get_root_dir()}/")
-        
+        command = [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id]
+        if environment_list:
+            command.extend(["-e", environment_list])
+        command.extend(["-f", workflow_zip_file_path, "-h", host_list, "-p", password_list])
+        subprocess.run(command, cwd=f"{get_root_dir()}/")

@@ -62,10 +62,10 @@ def install_jdk_linux(jdk_version, jdk_arch):
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
-    download_file(jdk_url, 'jdk.tar.gz')
+    download_file(jdk_url, f'{get_home_dir()}/jdk.tar.gz')
 
     # Extract JDK archive
-    extract_tar_archive('jdk.tar.gz', jdk_install_dir)
+    extract_tar_archive(f'{get_home_dir()}/jdk.tar.gz', jdk_install_dir)
 
     # Set JDK environment variables
     set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
@@ -76,10 +76,10 @@ def install_jdk_windows(jdk_version, jdk_arch):
     jdk_install_dir = os.path.expanduser('~/jdk')
 
     # Download JDK archive
-    download_file(jdk_url, 'jdk.zip')
+    download_file(jdk_url, f'{get_home_dir()}/jdk.zip')
 
     # Extract JDK archive
-    extract_zip_archive('jdk.zip', jdk_install_dir)
+    extract_zip_archive(f'{get_home_dir()}/jdk.zip', jdk_install_dir)
 
     # Set JDK environment variables
     set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
