@@ -18,7 +18,7 @@ def run_process(
     *,
     process_id: str,
     host_id: str,
-    password: str,
+    password: str = None,
     environment: str = None,
     sync_path: os.PathLike = None,
 ):
@@ -27,9 +27,13 @@ def run_process(
 
     Args: process_id - required
         host_id - required
-        password - required
+        password - optional
         environment - optional
     """
+    if password is None:
+        # prompt to ask for password
+        password = getpass.getpass(f"Enter password for host - {host_id}: ")
+    
     if sync_path:
         ext, matching_dict = None, None
         process_file = os.path.exists(os.path.join(sync_path, "code", "process.json"))

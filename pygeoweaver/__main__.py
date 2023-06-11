@@ -43,11 +43,11 @@ def main():
     # export workflow
     # export_workflow("gr3ykr8dynu12vrwq11oy", "4", "/Users/joe/Downloads/test_pygeoweaver_export.zip")
     # run process
-    # run_process(process_id="7zwnvx", host_id="100001", password="xxx", environment="",)
+    # run_process(process_id="7zwnvx", host_id="100001", )
     # run workflow by id
     # run_worklfow(workflow_id="9sszomwhiiusakodb1ft", host_list="100001", password_list="xxx",
     #              environment_list="",)
-    run_workflow(workflow_id="9sszomwhiiusakodb1ft", host_list="100001", )
+    # run_workflow(workflow_id="9sszomwhiiusakodb1ft", host_list="100001", )
     # run workflow by zip path
 
     # run workflow by folder path
@@ -57,6 +57,7 @@ def main():
     # show()
     # helpwith()
     # check_java()
+    pass
 
 
 if __name__ == "__main__":
