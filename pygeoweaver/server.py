@@ -1,4 +1,5 @@
 import os
+import socket
 import subprocess
 import webbrowser
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
@@ -51,14 +52,13 @@ def stop():
             shell=True,
         )
 
-
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
     download_geoweaver_jar()  # check if geoweaver is initialized
     check_java()
     if check_ipython():
         logger.info("enter ipython block")
         from IPython.display import IFrame
-
+        logger.warning("This only works when the Jupyter is visited from localhost!")
         return IFrame(src=geoweaver_url, width="100%", height="500px")
     else:
         logger.info("enter self opening block")
