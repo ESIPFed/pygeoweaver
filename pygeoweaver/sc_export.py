@@ -1,5 +1,10 @@
 import subprocess
-from pygeoweaver.utils import download_geoweaver_jar, get_geoweaver_jar_path, get_java_bin_path, get_root_dir
+from pygeoweaver.utils import (
+    download_geoweaver_jar,
+    get_geoweaver_jar_path,
+    get_java_bin_path,
+    get_root_dir,
+)
 
 
 def export_workflow(workflow_id, mode, target_file_path):
@@ -19,6 +24,16 @@ def export_workflow(workflow_id, mode, target_file_path):
     if not workflow_id:
         raise RuntimeError("Workflow id is missing")
     download_geoweaver_jar()
-    subprocess.run([get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "export", "workflow", 
-                    f"--mode={mode}", workflow_id, target_file_path,], 
-                   cwd=f"{get_root_dir()}/")
+    subprocess.run(
+        [
+            get_java_bin_path(),
+            "-jar",
+            get_geoweaver_jar_path(),
+            "export",
+            "workflow",
+            f"--mode={mode}",
+            workflow_id,
+            target_file_path,
+        ],
+        cwd=f"{get_root_dir()}/",
+    )
