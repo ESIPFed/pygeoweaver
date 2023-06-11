@@ -24,13 +24,13 @@ from pygeoweaver.server import show
 
 def main():
     # start geoweaver
-    start()
+    # start()
     # stop geoweaver
     # stop()
     # list resources
-    list_hosts()
-    list_processes()
-    list_workflows()
+    # list_hosts()
+    # list_processes()
+    # list_workflows()
     # show history
     # show_history("ll3u3W78eOEfklxhBJ")
     # detail host
@@ -47,6 +47,7 @@ def main():
     # run workflow by id
     # run_worklfow(workflow_id="9sszomwhiiusakodb1ft", host_list="100001", password_list="xxx",
     #              environment_list="",)
+    run_workflow(workflow_id="9sszomwhiiusakodb1ft", host_list="100001", )
     # run workflow by zip path
 
     # run workflow by folder path

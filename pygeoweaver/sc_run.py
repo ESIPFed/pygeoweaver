@@ -1,3 +1,4 @@
+import getpass
 import json
 import os
 import subprocess
@@ -108,6 +109,15 @@ def run_workflow(
     """
     download_geoweaver_jar()
 
+    if password_list is None:
+        # prompt to ask for password
+        password_list = []
+        for host in host_list.split(","):
+            password = getpass.getpass(f"Enter password for host - {host}: ")
+            password_list.append(password)
+    elif len(password_list.split(",")) != len(host_list.split(",")):
+        raise RuntimeError("The password list length doesn't match host list")
+
     if sync_path:
         from . import sync_workflow
 
@@ -130,7 +140,7 @@ def run_workflow(
         ]
         if environment_list:
             command.extend(["-e", environment_list])
-        command.extend(["-h", host_list, "-p", password_list])
+        command.extend(["-h", host_list, "-p", ",".join(password_list)])
         subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if workflow_folder_path and not workflow_zip_file_path:
