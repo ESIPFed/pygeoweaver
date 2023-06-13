@@ -37,6 +37,7 @@ def run_process(
     if sync_path:
         if not os.path.exists(sync_path):
             print('The specified path does nto exists')
+        print('Updating code on workflow with the given file path.\n')
         f = open(sync_path, "r")
         context = f.read()
         f.close()
