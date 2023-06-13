@@ -1,3 +1,5 @@
+import os.path
+import zipfile
 import subprocess
 from pygeoweaver.utils import (
     download_geoweaver_jar,
@@ -7,7 +9,7 @@ from pygeoweaver.utils import (
 )
 
 
-def export_workflow(workflow_id, mode=4, target_file_path=None):
+def export_workflow(workflow_id, mode=4, target_file_path=None, unzip=False):
     """
     Usage: <main class> export workflow [--mode=<export_mode>] <workflow_id>
                                     <target_file_path>
@@ -37,3 +39,8 @@ def export_workflow(workflow_id, mode=4, target_file_path=None):
         ],
         cwd=f"{get_root_dir()}/",
     )
+    if unzip:
+        with zipfile.ZipFile(target_file_path, 'r') as zip_ref:
+            zip_ref.extractall(os.path.dirname(target_file_path))
+
+
