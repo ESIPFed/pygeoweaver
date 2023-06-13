@@ -7,7 +7,7 @@ from pygeoweaver.utils import (
 )
 
 
-def export_workflow(workflow_id, mode, target_file_path):
+def export_workflow(workflow_id, mode=4, target_file_path=None):
     """
     Usage: <main class> export workflow [--mode=<export_mode>] <workflow_id>
                                     <target_file_path>
