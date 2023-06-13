@@ -67,9 +67,7 @@ def get_code_for_process(process_id):
     r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
                       data={'type': 'process', 'id': process_id}).json()
     code = r['code']
-
     decoded_string = code
-
     return decoded_string
 
 

@@ -4,6 +4,7 @@ import zipfile
 
 import requests
 import typing
+from enum import Enum
 
 from . import constants
 from pygeoweaver.utils import (
@@ -13,6 +14,44 @@ from pygeoweaver.utils import (
     get_root_dir,
     copy_files,
 )
+
+
+class Direction(str, Enum):
+    DOWNLOAD = "DOWNLOAD"
+    UPLOAD = "UPLOAD"
+
+
+def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], direction: Direction):
+    if direction == Direction.DOWNLOAD:
+        if not sync_to_path:
+            raise Exception("Sync path not found.")
+        r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+                          data={'type': 'process', 'id': process_id}).json()
+        code = r['code']
+        decoded_string = code
+        file_name = r['name']
+        ext = None
+        if r['lang'] == "python":
+            ext = ".py"
+        elif r['lang'] == "bash":
+            ext = ".sh"
+        else:
+            raise Exception("Unknown file format.")
+        with open(os.path.join(sync_to_path, file_name + ext), 'w') as file:
+            file.write(decoded_string)
+    if direction == Direction.UPLOAD:
+        if not sync_to_path:
+            raise Exception("Sync path not found.")
+        process_prev_state = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+                                           data={'type': 'process', 'id': process_id}).json()
+        f = open(sync_to_path, 'r')
+        f_content = f.read()
+        f.close()
+        process_prev_state['code'] = f_content
+        requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+                      data=json.dumps(process_prev_state), headers={'Content-Type': 'application/json'})
+    else:
+        raise Exception("Please specify the direction to sync. Choices - [UPLOAD, DOWNLOAD]")
 
 
 def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]):
@@ -29,7 +68,7 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
         os.makedirs(tmp_dir)
     # unzip the workflow
     with zipfile.ZipFile(
-        os.path.join(home_dir, "gw-workspace", "temp", filename)
+            os.path.join(home_dir, "gw-workspace", "temp", filename)
     ) as ref:
         ref.extractall(os.path.join(home_dir, "tmp"))
     # check if target workflow path and the unzipped workflow match
