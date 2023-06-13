@@ -4,26 +4,17 @@ import zipfile
 
 import requests
 import typing
-from enum import Enum
 
 from . import constants
 from pygeoweaver.utils import (
     download_geoweaver_jar,
-    get_geoweaver_jar_path,
-    get_java_bin_path,
-    get_root_dir,
     copy_files,
 )
 
 
-class Direction(str, Enum):
-    DOWNLOAD = "DOWNLOAD"
-    UPLOAD = "UPLOAD"
-
-
-def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], direction: Direction):
+def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], direction: str):
     print(f'Proceeding with {direction}\n')
-    if direction == Direction.DOWNLOAD:
+    if direction == "download":
         if not sync_to_path:
             raise Exception("Sync path not found.")
         r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
@@ -40,7 +31,7 @@ def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], directio
             raise Exception("Unknown file format.")
         with open(os.path.join(sync_to_path, file_name + ext), 'w') as file:
             file.write(decoded_string)
-    if direction == Direction.UPLOAD:
+    if direction == "upload":
         if not sync_to_path:
             raise Exception("Sync path not found.")
         process_prev_state = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
