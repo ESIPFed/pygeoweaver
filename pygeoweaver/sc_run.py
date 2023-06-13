@@ -118,10 +118,13 @@ def run_workflow(
             "run",
             "workflow",
             workflow_id,
+            "-h",
+            host_list,
+            "-p",
+            password_list
         ]
         if environment_list:
             command.extend(["-e", environment_list])
-        command.extend(["-h", host_list, "-p", ",".join(password_list)])
         subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if workflow_folder_path and not workflow_zip_file_path:
@@ -133,12 +136,15 @@ def run_workflow(
             "run",
             "workflow",
             workflow_id,
+            "-d",
+            workflow_folder_path,
+            "-h",
+            host_list,
+            "-p",
+            password_list
         ]
         if environment_list:
             command.extend(["-e", environment_list])
-        command.extend(
-            ["-d", workflow_folder_path, "-h", host_list, "-p", password_list]
-        )
         subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if not workflow_folder_path and workflow_zip_file_path:
@@ -149,10 +155,13 @@ def run_workflow(
             "run",
             "workflow",
             workflow_id,
+            "-f",
+            workflow_zip_file_path,
+            "-h",
+            host_list,
+            "-p",
+            password_list
         ]
         if environment_list:
             command.extend(["-e", environment_list])
-        command.extend(
-            ["-f", workflow_zip_file_path, "-h", host_list, "-p", password_list]
-        )
         subprocess.run(command, cwd=f"{get_root_dir()}/")
