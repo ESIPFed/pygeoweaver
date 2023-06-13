@@ -22,6 +22,7 @@ class Direction(str, Enum):
 
 
 def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], direction: Direction):
+    print(f'Proceeding with {direction}\n')
     if direction == Direction.DOWNLOAD:
         if not sync_to_path:
             raise Exception("Sync path not found.")
