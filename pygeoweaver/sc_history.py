@@ -38,7 +38,9 @@ def get_process_history(process_id):
             f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/logs",
             data={"type": "process", "id": process_id},
         ).json()
-        return pd.DataFrame(r)
+        df = pd.DataFrame(r)
+        df['history_begin_time'] = pd.to_datetime(df['history_begin_time'], unit='ms')
+        df['history_end_time'] = pd.to_datetime(df['history_end_time'], unit='ms')
     except Exception as e:
         subprocess.run(
             f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} process-history {process_id}",
