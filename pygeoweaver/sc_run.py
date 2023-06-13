@@ -15,12 +15,12 @@ from pygeoweaver.utils import (
 
 
 def run_process(
-    *,
-    process_id: str,
-    host_id: str,
-    password: str = None,
-    environment: str = None,
-    sync_path: os.PathLike = None,
+        *,
+        process_id: str,
+        host_id: str,
+        password: str = None,
+        environment: str = None,
+        sync_path: os.PathLike = None,
 ):
     """
     Run a process
@@ -33,43 +33,19 @@ def run_process(
     if password is None:
         # prompt to ask for password
         password = getpass.getpass(f"Enter password for host - {host_id}: ")
-    
+
     if sync_path:
-        ext, matching_dict = None, None
-        process_file = os.path.exists(os.path.join(sync_path, "code", "process.json"))
-        if not process_file:
-            print("process file does not exists, please check the path")
-            return
-        p_file = json.loads(
-            open(os.path.join(sync_path, "code", "process.json"), "r").read()
-        )
-        for item in p_file:
-            if item.get("id") == process_id:
-                matching_dict = item
-                break
-        if not matching_dict:
-            print("Could not find the file, please check the path")
-            return
-        if matching_dict["lang"] == "python":
-            ext = ".py"
-        if matching_dict["lang"] == "bash":
-            ext = ".bash"
-        if not ext:
-            print("Invalid file format.")
-        source_filename = matching_dict["name"] + ext
-        source_file_exists = os.path.exists(
-            os.path.join(sync_path, "code", source_filename)
-        )
-        if source_file_exists:
-            f = open(os.path.join(sync_path, "code", source_filename), "r").read()
-            matching_dict["code"] = f
-            requests.post(
-                f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
-                data=json.dumps(matching_dict),
-                headers={"Content-Type": "application/json"},
-            )
-        else:
-            print("File does not exists")
+        if not os.path.exists(sync_path):
+            print('The specified path does nto exists')
+        f = open(sync_path, "r")
+        context = f.read()
+        f.close()
+        details = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+                                data={'type': 'process', 'id': process_id}).json()
+        details['code'] = context
+        requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+                      data=json.dumps(details), headers={'Content-Type': 'application/json'})
+
     download_geoweaver_jar()
     subprocess.run(
         [
@@ -88,14 +64,14 @@ def run_process(
 
 
 def run_workflow(
-    *,
-    workflow_id: str,
-    workflow_folder_path: str = None,
-    workflow_zip_file_path: str = None,
-    environment_list: str = None,
-    host_list: str = None,
-    password_list: str = None,
-    sync_path: os.PathLike = None,
+        *,
+        workflow_id: str,
+        workflow_folder_path: str = None,
+        workflow_zip_file_path: str = None,
+        environment_list: str = None,
+        host_list: str = None,
+        password_list: str = None,
+        sync_path: os.PathLike = None,
 ):
     """
     Usage: <main class> run workflow [-d=<workflowFolderPath>]
