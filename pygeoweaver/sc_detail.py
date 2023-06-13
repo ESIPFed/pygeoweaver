@@ -3,6 +3,10 @@ Detail subcommand
 """
 
 import subprocess
+
+import requests
+from . import constants
+
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
@@ -57,3 +61,15 @@ def detail_host(host_id):
         ],
         cwd=f"{get_root_dir()}/",
     )
+
+
+def get_code_for_process(process_id):
+    r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+                      data={'type': 'process', 'id': process_id}).json()
+    code = r['code']
+
+    decoded_string = code
+
+    return decoded_string
+
+

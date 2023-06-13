@@ -52,6 +52,7 @@ def stop():
             shell=True,
         )
 
+
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
     download_geoweaver_jar()  # check if geoweaver is initialized
     check_java()
