@@ -114,7 +114,7 @@ def run_workflow(
         # command = [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow", workflow_id,
         #            "-d", workflow_folder_path, "-h", host_list, "-p", password_list]
         command = f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} run workflow {workflow_id}" \
-                  f"-d {workflow_folder_path} -h {host_list} -p {password_list}"
+                  f"-d '{workflow_folder_path}' -h {host_list} -p {password_list}"
         subprocess.run(command, cwd=f"{get_root_dir()}/", shell=True)
 
     if not workflow_folder_path and workflow_zip_file_path:
