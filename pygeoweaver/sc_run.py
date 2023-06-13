@@ -76,13 +76,7 @@ def run_workflow(
     download_geoweaver_jar()
 
     if password_list is None:
-        # Prompt to ask for password
-        password_list = []
-        for host in host_list.split(","):
-            password = getpass.getpass(f"Enter password for host - {host}: ")
-            password_list.append(password)
-    elif len(password_list.split(",")) != len(host_list.split(",")):
-        raise RuntimeError("The password list length doesn't match host list")
+        password_list = getpass.getpass(f"Enter password for host: ")
 
     if sync_path:
         from . import sync_workflow
