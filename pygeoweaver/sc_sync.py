@@ -31,6 +31,7 @@ def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], directio
             raise Exception("Unknown file format.")
         with open(os.path.join(sync_to_path, file_name + ext), 'w') as file:
             file.write(decoded_string)
+        print(f'Wrote file {file_name + ext} to {sync_to_path}')
     elif direction == "upload":
         if not sync_to_path:
             raise Exception("Sync path not found.")
