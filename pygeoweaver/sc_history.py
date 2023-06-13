@@ -41,6 +41,7 @@ def get_process_history(process_id):
         df = pd.DataFrame(r)
         df['history_begin_time'] = pd.to_datetime(df['history_begin_time'], unit='ms')
         df['history_end_time'] = pd.to_datetime(df['history_end_time'], unit='ms')
+        return df
     except Exception as e:
         subprocess.run(
             f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} process-history {process_id}",
