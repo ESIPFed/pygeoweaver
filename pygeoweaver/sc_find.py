@@ -1,14 +1,5 @@
-import json
-
 import requests
-import subprocess
 from . import constants
-from pygeoweaver.utils import (
-    download_geoweaver_jar,
-    get_geoweaver_jar_path,
-    get_java_bin_path,
-    get_root_dir, check_ipython,
-)
 import pandas as pd
 
 
