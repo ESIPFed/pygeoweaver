@@ -111,6 +111,7 @@ def run_workflow(
         )
 
     if workflow_id and not workflow_folder_path and not workflow_zip_file_path:
+        print(f"Using host: {host_list}")
         command = [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "run", "workflow",
                    workflow_id, "-h", host_list, "-p", password_list]
         subprocess.run(command, cwd=f"{get_root_dir()}/")
