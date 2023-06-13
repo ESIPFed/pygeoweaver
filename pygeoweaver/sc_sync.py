@@ -31,7 +31,7 @@ def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], directio
             raise Exception("Unknown file format.")
         with open(os.path.join(sync_to_path, file_name + ext), 'w') as file:
             file.write(decoded_string)
-    if direction == "upload":
+    elif direction == "upload":
         if not sync_to_path:
             raise Exception("Sync path not found.")
         process_prev_state = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
