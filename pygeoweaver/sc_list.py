@@ -37,7 +37,7 @@ def list_processes_in_workflow(workflow_id):
     }
     r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail", data=payload)
     nodes = json.loads(r.json()['nodes'])
-    result = [{'title': item['title'], 'id': item['id']} for item in nodes]
+    result = [{'title': item['title'], 'id': item['id'].split('.')[0]} for item in nodes]
 
     if check_ipython():
         return pd.DataFrame(result)

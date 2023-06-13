@@ -68,6 +68,6 @@ def get_code_for_process(process_id):
                       data={'type': 'process', 'id': process_id}).json()
     code = r['code']
     decoded_string = code
-    return decoded_string
+    print(decoded_string)
 
 
