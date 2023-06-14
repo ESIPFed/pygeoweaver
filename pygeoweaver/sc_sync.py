@@ -8,11 +8,53 @@ import typing
 from . import constants
 from pygeoweaver.utils import (
     download_geoweaver_jar,
-    get_geoweaver_jar_path,
-    get_java_bin_path,
-    get_root_dir,
     copy_files,
 )
+
+
+def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction: str):
+    print(f"Proceeding with {direction}\n")
+    if direction == "download":
+        if not local_path:
+            raise Exception("Sync path not found.")
+        r = requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            data={"type": "process", "id": process_id},
+        ).json()
+        code = r["code"]
+        decoded_string = code
+        file_name = r["name"]
+        ext = None
+        if r["lang"] == "python":
+            ext = ".py"
+        elif r["lang"] == "shell":
+            ext = ".sh"
+        elif r["lang"] == "jupyter":
+            ext = "ipynb"
+        else:
+            raise Exception("Unknown file format.")
+        with open(os.path.join(local_path, file_name + ext), "w") as file:
+            file.write(decoded_string)
+        print(f"Wrote file {file_name + ext} to {local_path}")
+    elif direction == "upload":
+        if not local_path:
+            raise Exception("Sync path not found.")
+        process_prev_state = requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            data={"type": "process", "id": process_id},
+        ).json()
+        with open(local_path, "r") as f:
+            f_content = f.read()
+            process_prev_state["code"] = f_content
+        requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+            data=json.dumps(process_prev_state),
+            headers={"Content-Type": "application/json"},
+        )
+    else:
+        raise Exception(
+            "Please specify the direction to sync. Choices - [UPLOAD, DOWNLOAD]"
+        )
 
 
 def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]):

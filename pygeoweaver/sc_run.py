@@ -5,13 +5,13 @@ import subprocess
 
 import requests
 
-from . import constants
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
     get_java_bin_path,
     get_root_dir,
 )
+from . import constants
 
 
 def run_process(
@@ -33,43 +33,25 @@ def run_process(
     if password is None:
         # prompt to ask for password
         password = getpass.getpass(f"Enter password for host - {host_id}: ")
-    
+
     if sync_path:
-        ext, matching_dict = None, None
-        process_file = os.path.exists(os.path.join(sync_path, "code", "process.json"))
-        if not process_file:
-            print("process file does not exists, please check the path")
-            return
-        p_file = json.loads(
-            open(os.path.join(sync_path, "code", "process.json"), "r").read()
+        if not os.path.exists(sync_path):
+            print("The specified path does nto exists")
+        print("Updating code on workflow with the given file path.\n")
+        f = open(sync_path, "r")
+        context = f.read()
+        f.close()
+        details = requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            data={"type": "process", "id": process_id},
+        ).json()
+        details["code"] = context
+        requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+            data=json.dumps(details),
+            headers={"Content-Type": "application/json"},
         )
-        for item in p_file:
-            if item.get("id") == process_id:
-                matching_dict = item
-                break
-        if not matching_dict:
-            print("Could not find the file, please check the path")
-            return
-        if matching_dict["lang"] == "python":
-            ext = ".py"
-        if matching_dict["lang"] == "bash":
-            ext = ".bash"
-        if not ext:
-            print("Invalid file format.")
-        source_filename = matching_dict["name"] + ext
-        source_file_exists = os.path.exists(
-            os.path.join(sync_path, "code", source_filename)
-        )
-        if source_file_exists:
-            f = open(os.path.join(sync_path, "code", source_filename), "r").read()
-            matching_dict["code"] = f
-            requests.post(
-                f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
-                data=json.dumps(matching_dict),
-                headers={"Content-Type": "application/json"},
-            )
-        else:
-            print("File does not exists")
+
     download_geoweaver_jar()
     subprocess.run(
         [
@@ -109,7 +91,7 @@ def run_workflow(
     -f, --workflow-zip-file-path=<workflowZipPath>
                                 workflow package or path to workflow zip to run
     -h, --hosts=<hostStrings>  hosts to run on. list of host ids with comma as separator.
-    -p, --passwords=<passes>   passwords to the target hosts. list of passwords with comma as separator. 
+    -p, --passwords=<passes>   passwords to the target hosts. list of passwords with comma as separator.
     """
     download_geoweaver_jar()
 
@@ -122,6 +104,7 @@ def run_workflow(
     elif len(password_list.split(",")) != len(host_list.split(",")):
         raise RuntimeError("The password list length doesn't match host list")
 
+    password_list = ",".join(password_list)
     if sync_path:
         from . import sync_workflow
 
@@ -141,10 +124,13 @@ def run_workflow(
             "run",
             "workflow",
             workflow_id,
+            "-h",
+            host_list,
+            "-p",
+            password_list,
         ]
         if environment_list:
             command.extend(["-e", environment_list])
-        command.extend(["-h", host_list, "-p", ",".join(password_list)])
         subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if workflow_folder_path and not workflow_zip_file_path:
@@ -156,12 +142,15 @@ def run_workflow(
             "run",
             "workflow",
             workflow_id,
+            "-d",
+            workflow_folder_path,
+            "-h",
+            host_list,
+            "-p",
+            password_list
         ]
         if environment_list:
             command.extend(["-e", environment_list])
-        command.extend(
-            ["-d", workflow_folder_path, "-h", host_list, "-p", password_list]
-        )
         subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if not workflow_folder_path and workflow_zip_file_path:
@@ -172,10 +161,13 @@ def run_workflow(
             "run",
             "workflow",
             workflow_id,
+            "-f",
+            workflow_zip_file_path,
+            "-h",
+            host_list,
+            "-p",
+            password_list,
         ]
         if environment_list:
             command.extend(["-e", environment_list])
-        command.extend(
-            ["-f", workflow_zip_file_path, "-h", host_list, "-p", password_list]
-        )
         subprocess.run(command, cwd=f"{get_root_dir()}/")
