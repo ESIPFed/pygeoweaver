@@ -9,10 +9,15 @@ from pygeoweaver.utils import (
 
 def reset_password():
     """
-  Usage: <main class> resetpassword
-  Reset password for localhost
-  """
+    Usage: <main class> resetpassword
+    Reset password for localhost
+    """
     download_geoweaver_jar()
     subprocess.run(
-        [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "resetpassword",]
+        [
+            get_java_bin_path(),
+            "-jar",
+            get_geoweaver_jar_path(),
+            "resetpassword",
+        ]
     )
