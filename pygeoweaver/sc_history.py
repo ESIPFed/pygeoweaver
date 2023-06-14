@@ -39,8 +39,8 @@ def get_process_history(process_id):
             data={"type": "process", "id": process_id},
         ).json()
         df = pd.DataFrame(r)
-        df['history_begin_time'] = pd.to_datetime(df['history_begin_time'], unit='ms')
-        df['history_end_time'] = pd.to_datetime(df['history_end_time'], unit='ms')
+        df["history_begin_time"] = pd.to_datetime(df["history_begin_time"], unit="ms")
+        df["history_end_time"] = pd.to_datetime(df["history_end_time"], unit="ms")
         return df
     except Exception as e:
         subprocess.run(
@@ -63,8 +63,8 @@ def get_workflow_history(workflow_id):
             data={"type": "workflow", "id": workflow_id},
         ).json()
         df = pd.DataFrame(r)
-        df['history_begin_time'] = pd.to_datetime(df['history_begin_time'], unit='ms')
-        df['history_end_time'] = pd.to_datetime(df['history_end_time'], unit='ms')
+        df["history_begin_time"] = pd.to_datetime(df["history_begin_time"], unit="ms")
+        df["history_end_time"] = pd.to_datetime(df["history_end_time"], unit="ms")
         return df
     except Exception as e:
         subprocess.run(

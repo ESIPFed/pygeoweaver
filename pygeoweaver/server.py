@@ -59,6 +59,7 @@ def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
     if check_ipython():
         logger.info("enter ipython block")
         from IPython.display import IFrame
+
         logger.warning("This only works when the Jupyter is visited from localhost!")
         return IFrame(src=geoweaver_url, width="100%", height="500px")
     else:

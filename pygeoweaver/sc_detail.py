@@ -64,8 +64,8 @@ def detail_host(host_id):
 
 
 def get_process_code(process_id):
-    r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
-                      data={'type': 'process', 'id': process_id}).json()
-    print(['code'])
-
-
+    r = requests.post(
+        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+        data={"type": "process", "id": process_id},
+    ).json()
+    print(["code"])

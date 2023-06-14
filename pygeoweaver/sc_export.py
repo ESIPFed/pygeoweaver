@@ -9,7 +9,9 @@ from pygeoweaver.utils import (
 )
 
 
-def export_workflow(workflow_id, mode=4, target_file_path=None, unzip=False, unzip_directory_name=None):
+def export_workflow(
+    workflow_id, mode=4, target_file_path=None, unzip=False, unzip_directory_name=None
+):
     """
     Usage: <main class> export workflow [--mode=<export_mode>] <workflow_id>
                                     <target_file_path>
@@ -42,7 +44,7 @@ def export_workflow(workflow_id, mode=4, target_file_path=None, unzip=False, unz
     if unzip:
         if not unzip_directory_name:
             raise Exception("Please provide unzip directory name")
-        with zipfile.ZipFile(target_file_path, 'r') as zip_ref:
-            zip_ref.extractall(os.path.join(os.path.dirname(target_file_path), unzip_directory_name))
-
-
+        with zipfile.ZipFile(target_file_path, "r") as zip_ref:
+            zip_ref.extractall(
+                os.path.join(os.path.dirname(target_file_path), unzip_directory_name)
+            )
