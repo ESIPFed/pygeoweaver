@@ -12,39 +12,51 @@ from pygeoweaver.utils import (
 )
 
 
-def sync(process_id: str, sync_to_path: typing.Union[str, os.PathLike], direction: str):
-    print(f'Proceeding with {direction}\n')
+def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction: str):
+    print(f"Proceeding with {direction}\n")
     if direction == "download":
-        if not sync_to_path:
+        if not local_path:
             raise Exception("Sync path not found.")
-        r = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
-                          data={'type': 'process', 'id': process_id}).json()
-        code = r['code']
+        r = requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            data={"type": "process", "id": process_id},
+        ).json()
+        code = r["code"]
         decoded_string = code
-        file_name = r['name']
+        file_name = r["name"]
         ext = None
-        if r['lang'] == "python":
+        if r["lang"] == "python":
             ext = ".py"
-        elif r['lang'] == "bash":
+        elif r["lang"] == "shell":
             ext = ".sh"
+        elif r["lang"] == "builtin":
+            pass  # TODO: need to figure out what is builtin extension name
+        elif r["lang"] == "jupyter":
+            ext = "ipynb"
         else:
             raise Exception("Unknown file format.")
-        with open(os.path.join(sync_to_path, file_name + ext), 'w') as file:
+        with open(os.path.join(local_path, file_name + ext), "w") as file:
             file.write(decoded_string)
-        print(f'Wrote file {file_name + ext} to {sync_to_path}')
+        print(f"Wrote file {file_name + ext} to {local_path}")
     elif direction == "upload":
-        if not sync_to_path:
+        if not local_path:
             raise Exception("Sync path not found.")
-        process_prev_state = requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
-                                           data={'type': 'process', 'id': process_id}).json()
-        f = open(sync_to_path, 'r')
-        f_content = f.read()
-        f.close()
-        process_prev_state['code'] = f_content
-        requests.post(f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
-                      data=json.dumps(process_prev_state), headers={'Content-Type': 'application/json'})
+        process_prev_state = requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            data={"type": "process", "id": process_id},
+        ).json()
+        with open(local_path, "r") as f:
+            f_content = f.read()
+            process_prev_state["code"] = f_content
+        requests.post(
+            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+            data=json.dumps(process_prev_state),
+            headers={"Content-Type": "application/json"},
+        )
     else:
-        raise Exception("Please specify the direction to sync. Choices - [UPLOAD, DOWNLOAD]")
+        raise Exception(
+            "Please specify the direction to sync. Choices - [UPLOAD, DOWNLOAD]"
+        )
 
 
 def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]):
@@ -61,7 +73,7 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
         os.makedirs(tmp_dir)
     # unzip the workflow
     with zipfile.ZipFile(
-            os.path.join(home_dir, "gw-workspace", "temp", filename)
+        os.path.join(home_dir, "gw-workspace", "temp", filename)
     ) as ref:
         ref.extractall(os.path.join(home_dir, "tmp"))
     # check if target workflow path and the unzipped workflow match

@@ -12,6 +12,9 @@ def get_process_by_name(process_name):
     for process in process_list:
         if process['name'] == process_name:
             matching_processes.append(process)
+    pd.set_option('display.max_columns', None)  # Display all columns
+    pd.set_option('display.max_rows', None)  # Display all rows
+    pd.set_option('display.expand_frame_repr', False)  # Prevent truncation of columns
     pd.DataFrame(matching_processes)
 
 
@@ -24,6 +27,9 @@ def get_process_by_id(process_id):
     for process in process_list:
         if process['id'] == process_id:
             matching_processes.append(process)
+    pd.set_option('display.max_columns', None)  # Display all columns
+    pd.set_option('display.max_rows', None)  # Display all rows
+    pd.set_option('display.expand_frame_repr', False)  # Prevent truncation of columns
     pd.DataFrame(matching_processes)
 
 
@@ -36,5 +42,8 @@ def get_process_by_language(language):
     for process in process_list:
         if process['lang'] == language:
             matching_processes.append(process)
+    pd.set_option('display.max_columns', None)  # Display all columns
+    pd.set_option('display.max_rows', None)  # Display all rows
+    pd.set_option('display.expand_frame_repr', False)  # Prevent truncation of columns
     pd.DataFrame(matching_processes)
 
