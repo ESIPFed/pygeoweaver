@@ -9,11 +9,11 @@ from pygeoweaver.utils import (
 
 def import_workflow(workflow_zip_file_path):
     """
-  Usage: <main class> import workflow <workflow_zip_file_path>
-  import a workflow from file
-        <workflow_zip_file_path>
-          Geoweaver workflow zip file path
-  """
+    Usage: <main class> import workflow <workflow_zip_file_path>
+    import a workflow from file
+          <workflow_zip_file_path>
+            Geoweaver workflow zip file path
+    """
     if not workflow_zip_file_path:
         raise RuntimeError("Workflow zip file path is missing")
     download_geoweaver_jar()
@@ -28,3 +28,6 @@ def import_workflow(workflow_zip_file_path):
         ],
         cwd=f"{get_root_dir()}/",
     )
+
+def import_workflow_from_github(git_repo_url):
+    pass
