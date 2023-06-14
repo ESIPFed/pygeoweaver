@@ -96,6 +96,7 @@ def run_workflow(
     download_geoweaver_jar()
 
     if password_list is None:
+        # prompt to ask for password
         password_list = []
         for host in host_list.split(","):
             password = getpass.getpass(f"Enter password for host - {host}: ")
