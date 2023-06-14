@@ -29,8 +29,6 @@ def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction:
             ext = ".py"
         elif r["lang"] == "shell":
             ext = ".sh"
-        elif r["lang"] == "builtin":
-            pass  # TODO: need to figure out what is builtin extension name
         elif r["lang"] == "jupyter":
             ext = "ipynb"
         else:
