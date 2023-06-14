@@ -100,6 +100,9 @@ def run_workflow(
         for host in host_list.split(","):
             password = getpass.getpass(f"Enter password for host - {host}: ")
             password_list.append(password)
+    elif len(password_list.split(",")) != len(host_list.split(",")):
+        raise RuntimeError("The password list length doesn't match host list")
+
     password_list = ",".join(password_list)
     if sync_path:
         from . import sync_workflow
@@ -125,6 +128,8 @@ def run_workflow(
             "-p",
             password_list,
         ]
+        if environment_list:
+            command.extend(["-e", environment_list])
         subprocess.run(command, cwd=f"{get_root_dir()}/")
 
     if workflow_folder_path and not workflow_zip_file_path:
@@ -133,11 +138,8 @@ def run_workflow(
             f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} run workflow {workflow_id}"
             f" -d '{workflow_folder_path}' -h {host_list} -p {password_list}"
         )
-        print(
-            "Running Commnad: ",
-            f"{get_java_bin_path()} -jar {get_geoweaver_jar_path()} run workflow {workflow_id}"
-            f" -d '{workflow_folder_path}' -h {host_list}",
-        )
+        if environment_list:
+            command += f" -e {environment_list}"
         subprocess.run(command, cwd=f"{get_root_dir()}/", shell=True)
 
     if not workflow_folder_path and workflow_zip_file_path:
@@ -155,4 +157,6 @@ def run_workflow(
             "-p",
             password_list,
         ]
+        if environment_list:
+            command.extend(["-e", environment_list])
         subprocess.run(command, cwd=f"{get_root_dir()}/")
