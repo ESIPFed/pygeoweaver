@@ -1,3 +1,5 @@
+import getpass
+from logging import getLogger
 import subprocess
 from pygeoweaver.utils import (
     check_ipython,
@@ -7,10 +9,12 @@ from pygeoweaver.utils import (
     get_root_dir,
 )
 
+logger = getLogger(__name__)
+
 def get_password_twice():
     while True:
-        password1 = getpass('Enter password: ')
-        password2 = getpass('Re-enter password: ')
+        password1 = getpass.getpass('Enter password: ')
+        password2 = getpass.getpass('Re-enter password: ')
         
         if password1 == password2:
             return password1
@@ -26,6 +30,7 @@ def reset_password():
     download_geoweaver_jar()
     
     if check_ipython():
+        logger.debug("ipython is here")
         password = get_password_twice()
         subprocess.run(
             [
@@ -38,6 +43,7 @@ def reset_password():
             ]
         )
     else:
+        logger.debug("not ipython")
         subprocess.run(
             [
                 get_java_bin_path(),
