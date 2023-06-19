@@ -1,6 +1,6 @@
 # Pygeoweaver
 
-Pygeoweaver is a Python library for geospatial data processing and analysis. It provides a user-friendly interface to create and execute processes and workflows for geospatial tasks.
+Pygeoweaver is a Python library for geospatial data processing and analysis. It provides a user-friendly functionality to create and execute processes and workflows for geospatial tasks.
 
 ## Features
 
@@ -74,7 +74,7 @@ Contributions to Pygeoweaver are welcome! If you find any issues or have suggest
 
 ## License
 
-Pygeoweaver is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
+Pygeoweaver is licensed under the MIT License. 
 
 ---
 
