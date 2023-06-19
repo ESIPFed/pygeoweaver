@@ -1,99 +1,81 @@
-## PyGeoWeaver
+# Pygeoweaver
 
-### Description
+Pygeoweaver is a Python library for geospatial data processing and analysis. It provides a user-friendly interface to create and execute processes and workflows for geospatial tasks.
 
-This package is a Python wrapper of the GeoWeaver app which was written in Java. This package is designed for Jupyter users to be able to directly use Geoweaver in Jupyter notebook or JupyterLab (JupyterHub).
+## Features
 
-### Installation
+- Easy creation of geospatial processes and workflows.
+- Support for multiple programming languages.
+- Integration with GeoWeaver API for process execution.
+- Documentation available at [https://gokulprathin8.github.io/pygeoweaver-docs.github.io/](https://gokulprathin8.github.io/pygeoweaver-docs.github.io/).
 
-`pip install pygeoweaver`
+## Installation
 
-### Usage
+You can install Pygeoweaver using pip:
 
-1. To show Geoweaver graphic user interface, please create a new cell and type:
-
-```
-import geoweaver
-geoweaver.start()
-```
-
-The command will first check if Geoweaver has been downloaded and installed. If no, it will automatically download and install Geoweaver in the local environment. Then it will open Geoweaver in the cell output in a iframe. Users can use all the functions provided in Geoweaver.
-
-2. To stop Geoweaver, please run:
-
-```
-geoweaver.stop()
+```bash
+pip install pygeoweaver
 ```
 
-3. To list the existing objects, please run:
+## Usage
 
-```
-geoweaver.list_hosts()
-geoweaver.list_processes()
-geoweaver.list_workflows()
-```
+Here's a basic example of how to use Pygeoweaver to create a process:
 
-4. To run a workflow, please run:
-```
-geoweaver.run_workflow("workflow_id", "host_id_list", "password_list", "environment_list")
-```
+```python
+from pygeoweaver import create_process
 
-or
+lang = "python"
+description = "Process for calculating NDVI"
+name = "NDVI Calculation"
+code = """
+# Python code for calculating NDVI
+# ...
 
-```
-geoweaver.run_workflow("workflow_zip_file_path", "host_id_list", "password_list", "environment_list")
-```
+# Your code here
+"""
 
-or 
-
-```
-geoweaver.run_workflow("workflow_local_folder_path", "host_id_list", "password_list", "environment_list")
+# Create the process
+process_id = create_process(lang, description, name, code)
 ```
 
-5. To export a workflow:
+To create a process from a file:
 
-```
-geoweaver.export_workflow("workflow_id", "workflow_zip_save_path")
-```
+```python
+from pygeoweaver import create_process_from_file
 
-6. To import a workflow:
+lang = "python"
+description = "Process for calculating NDVI"
+name = "NDVI Calculation"
+file_path = "ndvi_calculation.py"
 
-```
-geoweaver.import_workflow("<workflow_zip_file_path>")
-```
-
-or
-
-```
-geoweaver.import_workflow("<workflow_folder_path>")
+# Create the process from the file
+process_id = create_process_from_file(lang, description, name, file_path)
 ```
 
-7. To get history of a workflow run:
+Creating a workflow:
 
-```
-geoweaver.history("<workflow_history_id>")
-```
+```python
+from pygeoweaver import create_workflow
 
-8. To get history of a process run:
+description = "Workflow for processing geospatial data"
+edges = "..."
+name = "Data Processing Workflow"
+nodes = "..."
 
-```
-geoweaver.history("<process_history_id>")
-```
-
-9. To check the source code of a process
-
-```
-geoweaver.detail_processs("<process_id>")
+# Create the workflow
+workflow_id = create_workflow(description, edges, name, nodes)
 ```
 
-10. To check the configuration of a workflow
+For more information and detailed documentation, please visit [https://gokulprathin8.github.io/pygeoweaver-docs.github.io/](https://gokulprathin8.github.io/pygeoweaver-docs.github.io/).
 
-```
-geoweaver.detail_workflow("<workflow_id>")
-```
+## Contributing
 
-11. To check the details of a host:
+Contributions to Pygeoweaver are welcome! If you find any issues or have suggestions for improvements, please feel free to open an issue or submit a pull request on the GitHub repository.
 
-```
-geoweaver.detail_host("<host_id>")
-```
+## License
+
+Pygeoweaver is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
+
+---
+
+Thank you for choosing Pygeoweaver! We hope this library simplifies your geospatial data processing tasks. If you have any questions or need further assistance, please refer to the documentation or reach out to us. Happy coding!
