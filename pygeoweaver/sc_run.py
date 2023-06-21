@@ -11,7 +11,7 @@ from pygeoweaver.utils import (
     get_java_bin_path,
     get_root_dir,
 )
-from . import constants
+from pygeoweaver.constants import *
 
 
 def run_process(
@@ -42,12 +42,12 @@ def run_process(
         context = f.read()
         f.close()
         details = requests.post(
-            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
             data={"type": "process", "id": process_id},
         ).json()
         details["code"] = context
         requests.post(
-            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
             data=json.dumps(details),
             headers={"Content-Type": "application/json"},
         )

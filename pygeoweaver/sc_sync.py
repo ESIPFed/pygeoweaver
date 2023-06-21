@@ -5,7 +5,7 @@ import zipfile
 import requests
 import typing
 
-from . import constants
+from pygeoweaver.constants import *
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     copy_files,
@@ -18,7 +18,7 @@ def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction:
         if not local_path:
             raise Exception("Sync path not found.")
         r = requests.post(
-            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
             data={"type": "process", "id": process_id},
         ).json()
         code = r["code"]
@@ -40,14 +40,14 @@ def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction:
         if not local_path:
             raise Exception("Sync path not found.")
         process_prev_state = requests.post(
-            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
             data={"type": "process", "id": process_id},
         ).json()
         with open(local_path, "r") as f:
             f_content = f.read()
             process_prev_state["code"] = f_content
         requests.post(
-            f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
             data=json.dumps(process_prev_state),
             headers={"Content-Type": "application/json"},
         )
@@ -61,7 +61,7 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
     download_geoweaver_jar()
     # download workflow
     r = requests.post(
-        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/downloadworkflow",
+        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/downloadworkflow",
         data={"id": workflow_id, "option": "workflowwithprocesscodeallhistory"},
     ).text
     filename = r.rsplit("/")[-1]
