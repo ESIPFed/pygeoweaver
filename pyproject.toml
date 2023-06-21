@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pygeoweaver"
-version = "0.7.1"
+version = "0.7.2"
 authors = [
   { name="Geoweaver team", email="geoweaver.app@gmail.com" },
 ]
 description = "This is a wrapper package of the Geoweaver app."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.7,<4"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -22,14 +22,14 @@ classifiers = [
 
 [tool.poetry]
 name = "pygeoweaver"
-version = "0.7.1"
+version = "0.7.2"
 description = "This is a wrapper package of the Geoweaver app."
 authors = ["Geoweaver team <geoweaver.app@gmail.com>"]
 readme = "README.md"
 homepage = "https://github.com/ESIPFed/pygeoweaver"
 
 [tool.poetry.dependencies]
-python = ">=3.7"
+python = ">=3.7,<4"
 setuptools = ">=61.0"
 requests = "2.28.2"
 pydantic = "1.10.9"

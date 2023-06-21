@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 from pydantic import BaseModel
 
-from . import constants
+from pygeoweaver.constants import *
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
@@ -63,9 +63,9 @@ def create_process(lang, description, name, code, owner="111111", confidential=F
     )
     data_json = process.json()
     r = requests.post(
-        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/process",
+        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/process",
         data=data_json,
-        headers=constants.COMMON_API_HEADER,
+        headers=COMMON_API_HEADER,
     )
     if check_ipython() and r.ok:
         df = pd.DataFrame(json.loads(data_json).items(), columns=["Key", "Value"])
@@ -133,9 +133,9 @@ def create_workflow(
     )
     data_json = workflow.json()
     r = requests.post(
-        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/workflow",
+        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/add/workflow",
         data=data_json,
-        headers=constants.COMMON_API_HEADER,
+        headers=COMMON_API_HEADER,
     )
     if check_ipython():
         return pd.DataFrame(json.loads(data_json).items(), columns=["Key", "Value"])

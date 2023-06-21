@@ -1,11 +1,11 @@
 import requests
-from . import constants
+from pygeoweaver.constants import *
 import pandas as pd
 
 
 def get_process_by_name(process_name):
     response = requests.post(
-        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
+        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
     )
     process_list = response.json()
 
@@ -22,7 +22,7 @@ def get_process_by_name(process_name):
 
 def get_process_by_id(process_id):
     response = requests.post(
-        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
+        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
     )
     process_list = response.json()
 
@@ -39,7 +39,7 @@ def get_process_by_id(process_id):
 
 def get_process_by_language(language):
     response = requests.post(
-        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
+        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
     )
     process_list = response.json()
 

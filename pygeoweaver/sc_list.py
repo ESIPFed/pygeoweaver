@@ -2,7 +2,7 @@ import json
 
 import requests
 import subprocess
-from . import constants
+from pygeoweaver.constants import *
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
@@ -34,7 +34,7 @@ def list_processes_in_workflow(workflow_id):
     download_geoweaver_jar()
     payload = {"id": workflow_id, "type": "workflow"}
     r = requests.post(
-        f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail", data=payload
+        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail", data=payload
     )
     nodes = json.loads(r.json()["nodes"])
     result = [
