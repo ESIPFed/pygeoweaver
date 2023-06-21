@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pygeoweaver"
-version = "0.7.2"
+version = "0.7.3"
 authors = [
   { name="Geoweaver team", email="geoweaver.app@gmail.com" },
 ]
@@ -22,7 +22,7 @@ classifiers = [
 
 [tool.poetry]
 name = "pygeoweaver"
-version = "0.7.2"
+version = "0.7.3"
 description = "This is a wrapper package of the Geoweaver app."
 authors = ["Geoweaver team <geoweaver.app@gmail.com>"]
 readme = "README.md"
@@ -38,3 +38,4 @@ pydantic = "1.10.9"
 
 [tool.pytest.ini_options]
 addopts = "-p no:warnings --cov=pygeoweaver --cov-report=html"
+
