@@ -46,11 +46,15 @@ def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction:
         with open(local_path, "r") as f:
             f_content = f.read()
             process_prev_state["code"] = f_content
-        requests.post(
-            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
-            data=json.dumps(process_prev_state),
-            headers={"Content-Type": "application/json"},
-        )
+            response = requests.post(
+                f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+                data=json.dumps(process_prev_state),
+                headers={"Content-Type": "application/json"},
+            )
+            if response.status_code == 200:
+                print("Process update was successful")
+            else:
+                print("Update failed with status code:", response.status_code)
     else:
         raise Exception(
             "Please specify the direction to sync. Choices - [UPLOAD, DOWNLOAD]"
