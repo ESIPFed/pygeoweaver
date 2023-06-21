@@ -68,4 +68,4 @@ def get_process_code(process_id):
         f"{constants.GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
         data={"type": "process", "id": process_id},
     ).json()
-    print(["code"])
+    return r["code"]
