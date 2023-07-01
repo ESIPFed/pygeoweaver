@@ -1,4 +1,13 @@
+
 ## PyGeoWeaver
+
+||  |
+|--|--|
+|Latest Release|![Static Badge](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54&label=python%203.9%20%7C%20python%203.10%20%7C%20python%203.11)  ![PyPI](https://img.shields.io/pypi/v/pygeoweaver?style=for-the-badge&label=Pygeoweaver)|
+|Getting Help| [![Documentation Status](https://readthedocs.org/projects/pygeoweaver/badge/?version=latest&style=for-the-badge)](https://pygeoweaver.readthedocs.io/en/latest/?badge=latest) |
+|Activity|![PyPI - Downloads](https://img.shields.io/pypi/dm/pygeoweaver?style=for-the-badge) ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/ESIPFed/pygeoweaver?style=for-the-badge&label=Commit%20Activity)|
+|Community| ![Static Badge](https://img.shields.io/badge/ESIP-blue?style=for-the-badge&link=https%3A%2F%2Fwww.esipfed.org%2F)|
+|License|![GitHub](https://img.shields.io/github/license/ESIPFed/pygeoweaver?style=for-the-badge)|
 
 PyGeoWeaver is a Python package that provides a convenient and user-friendly interface to interact with GeoWeaver, a powerful geospatial data processing application written in Java. With PyGeoWeaver, Jupyter notebook and JupyterLab users can seamlessly integrate and utilize the capabilities of GeoWeaver within their Python workflows.
 
@@ -108,4 +117,3 @@ PyGeoWeaver is licensed under the MIT License.
 ---
 
 Thank you for choosing PyGeoWeaver! We hope this package enhances your geospatial data processing workflows. If you have any questions or need assistance, please refer to the documentation or reach out to us. Happy geospatial processing!
-
