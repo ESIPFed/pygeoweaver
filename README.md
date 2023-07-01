@@ -15,7 +15,7 @@ pip install pygeoweaver
 - Simplified creation of geospatial processes and workflows.
 - Support for multiple programming languages.
 - Seamless integration with the GeoWeaver API for efficient process execution.
-- Comprehensive documentation available at [https://gokulprathin8.github.io/pygeoweaver-docs.github.io/](https://gokulprathin8.github.io/pygeoweaver-docs.github.io/).
+- Comprehensive documentation available at [https://pygeoweaver.readthedocs.io/](https://pygeoweaver.readthedocs.io/).
 
 ## Usage
 
@@ -93,7 +93,7 @@ geoweaver.detail_host("<host_id>")
 
 ## Documentation
 
-For detailed documentation and examples, please visit the [PyGeoWeaver Documentation](https://gokulprathin8.github.io/pygeoweaver-docs.github.io/).
+For detailed documentation and examples, please visit the [PyGeoWeaver Documentation](https://pygeoweaver.readthedocs.io/).
 
 ## Contributing
 
