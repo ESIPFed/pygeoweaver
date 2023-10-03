@@ -22,47 +22,26 @@ def detail_workflow(workflow_id):
     if not workflow_id:
         raise RuntimeError("Workflow id is missing")
     download_geoweaver_jar()
+    url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail"
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    workflow_id = "grlgu9mkbry3qe8qxdg1"
+    type = "workflow"
+
+    form_data = {'type': type, 'id': workflow_id}
+
+    d = requests.post(url=url, data=form_data, headers=headers)
+    d = d.json()
+    d['nodes'] = json.loads(d['nodes'])
     try:
-        # If we're in a Jupyter environment, use IPython Widgets to display the table
         from IPython import get_ipython
         if 'IPKernelApp' in get_ipython().config:
-            url = "http://localhost:8070/Geoweaver/web/detail"
-            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-            workflow_id = "grlgu9mkbry3qe8qxdg1"
-            type = "workflow"
-
-            form_data = {'type': type, 'id': workflow_id}
-
-            d = requests.post(url=url, data=form_data, headers=headers)
-            d = d.json()
-            d['nodes'] = json.loads(d['nodes'])
-
-            # Create an HTML table from the 'd' dictionary
             table_html = create_table([d])
-
-            # Display the HTML table using IPython Widgets
             table_output = widgets.Output()
             with table_output:
                 display(HTML(table_html))
-
             display(table_output)
     except:
-        # If not in a Jupyter environment, use Pandas to display the table
-        url = "http://localhost:8070/Geoweaver/web/detail"
-        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        workflow_id = "grlgu9mkbry3qe8qxdg1"
-        type = "workflow"
-
-        form_data = {'type': type, 'id': workflow_id}
-
-        d = requests.post(url=url, data=form_data, headers=headers)
-        d = d.json()
-        d['nodes'] = json.loads(d['nodes'])
-
-        # Create a Pandas DataFrame from the 'd' dictionary
         df = pd.DataFrame([d])
-
-        # Display the DataFrame using Pandas
         display(df)
 
 
