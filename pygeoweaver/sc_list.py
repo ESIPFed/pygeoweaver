@@ -1,7 +1,6 @@
 import json
 
 import requests
-import subprocess
 
 from IPython.core.display_functions import display
 from ipywidgets import HTML
@@ -9,22 +8,21 @@ from ipywidgets import HTML
 from pygeoweaver.constants import *
 from pygeoweaver.utils import (
     download_geoweaver_jar,
-    get_geoweaver_jar_path,
-    get_java_bin_path,
-    get_root_dir,
     check_ipython, create_table,
 )
 import pandas as pd
 
 
 def list_hosts():
+    from IPython import get_ipython
+    ip = get_ipython()
     download_geoweaver_jar()
     url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list"
     form_data = {'type': 'host'}
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     data = requests.post(url=url, headers=headers, data=form_data)
 
-    if 'get_ipython' in globals():
+    if ip is not None:
         # Running in a Jupyter Notebook, display as HTML table
         data_json = data.json()
         table_html, _ = create_table(data_json)
@@ -37,13 +35,15 @@ def list_hosts():
 
 
 def list_processes():
+    from IPython import get_ipython
+    ip = get_ipython()
     download_geoweaver_jar()
     url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list"
     form_data = {'type': 'process'}
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     data = requests.post(url=url, headers=headers, data=form_data)
 
-    if 'get_ipython' in globals():
+    if ip is not None:
         data_json = data.json()
         table_html, _ = create_table(data_json)
         display(HTML(table_html))
@@ -70,13 +70,15 @@ def list_processes_in_workflow(workflow_id):
 
 
 def list_workflows():
+    from IPython import get_ipython
+    ip = get_ipython()
     download_geoweaver_jar()
     url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list"
     form_data = {'type': 'workflow'}
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     data = requests.post(url=url, headers=headers, data=form_data)
 
-    if 'get_ipython' in globals():
+    if ip is not None:
         data_json = data.json()
         table_html, _ = create_table(data_json)
         display(HTML(table_html))
