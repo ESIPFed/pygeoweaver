@@ -66,7 +66,7 @@ def run_process(
             process_id,
         ],
         cwd=f"{get_root_dir()}/",
-    )
+    )  # TODO: need to re-implement password encryption same as Geoweaver codebase to change this
 
 
 def run_workflow(
@@ -171,3 +171,4 @@ def run_workflow(
         if environment_list:
             command.extend(["-e", environment_list])
         subprocess.run(command, cwd=f"{get_root_dir()}/")
+        # TODO: need to re-implement password encryption same as Geoweaver codebase to change this
