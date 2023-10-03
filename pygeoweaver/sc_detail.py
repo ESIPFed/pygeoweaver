@@ -24,11 +24,7 @@ def detail_workflow(workflow_id):
     download_geoweaver_jar()
     url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail"
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    workflow_id = "grlgu9mkbry3qe8qxdg1"
-    type = "workflow"
-
-    form_data = {'type': type, 'id': workflow_id}
-
+    form_data = {'type': 'workflow', 'id': workflow_id}
     d = requests.post(url=url, data=form_data, headers=headers)
     d = d.json()
     d['nodes'] = json.loads(d['nodes'])
@@ -49,16 +45,23 @@ def detail_process(process_id):
     if not process_id:
         raise RuntimeError("Process id is missing")
     download_geoweaver_jar()
-    subprocess.run(
-        [
-            get_java_bin_path(),
-            "-jar",
-            get_geoweaver_jar_path(),
-            "detail",
-            f"--process-id={process_id}",
-        ],
-        cwd=f"{get_root_dir()}/",
-    )
+    url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail"
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    form_data = {'type': 'process', 'id': process_id}
+    d = requests.post(url=url, data=form_data, headers=headers)
+    d = d.json()
+    d['nodes'] = json.loads(d['nodes'])
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' in get_ipython().config:
+            table_html = create_table([d])
+            table_output = widgets.Output()
+            with table_output:
+                display(HTML(table_html))
+            display(table_output)
+    except:
+        df = pd.DataFrame([d])
+        display(df)
 
 
 def detail_host(host_id):
