@@ -37,8 +37,7 @@ def detail_workflow(workflow_id):
                 display(HTML(table_html))
             display(table_output)
     except:
-        df = pd.DataFrame([d])
-        display(df)
+        return pd.DataFrame([d])
 
 
 def detail_process(process_id):
@@ -60,24 +59,28 @@ def detail_process(process_id):
                 display(HTML(table_html))
             display(table_output)
     except:
-        df = pd.DataFrame([d])
-        display(df)
+        return pd.DataFrame([d])
 
 
 def detail_host(host_id):
     if not host_id:
         raise RuntimeError("Host id is missing")
     download_geoweaver_jar()
-    subprocess.run(
-        [
-            get_java_bin_path(),
-            "-jar",
-            get_geoweaver_jar_path(),
-            "detail",
-            f"--host-id={host_id}",
-        ],
-        cwd=f"{get_root_dir()}/",
-    )
+    url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail"
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    form_data = {'type': 'host', 'id': host_id}
+    d = requests.post(url=url, data=form_data, headers=headers)
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' in get_ipython().config:
+            table_html = create_table([d])
+            table_output = widgets.Output()
+            with table_output:
+                display(HTML(table_html))
+            display(table_output)
+    except:
+        return pd.DataFrame([d])
+
 
 
 def get_process_code(process_id):
