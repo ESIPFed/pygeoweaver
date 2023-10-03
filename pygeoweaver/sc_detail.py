@@ -2,7 +2,6 @@
 Detail subcommand
 """
 import json
-import subprocess
 
 import pandas as pd
 import requests
