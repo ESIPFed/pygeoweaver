@@ -1,11 +1,8 @@
 import os.path
-import subprocess
 
 import requests
-
-from pygeoweaver import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.utils import (
-    download_geoweaver_jar
+    download_geoweaver_jar,
 )
 
 
@@ -16,6 +13,7 @@ def import_workflow(workflow_zip_file_path):
           <workflow_zip_file_path>
             Geoweaver workflow zip file path
     """
+    from pygeoweaver import GEOWEAVER_DEFAULT_ENDPOINT_URL
     if not workflow_zip_file_path:
         raise RuntimeError("Workflow zip file path is missing")
     download_geoweaver_jar()
