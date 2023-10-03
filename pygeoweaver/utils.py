@@ -146,3 +146,23 @@ def copy_files(source_folder, destination_folder):
             )
             os.makedirs(os.path.dirname(destination_file), exist_ok=True)
             shutil.copy2(source_file, destination_file)
+
+
+def create_table(data):
+    table_html = "<table><tr>"
+
+    # Create table headers
+    for key in data[0].keys():
+        table_html += f"<th>{key}</th>"
+    table_html += "</tr>"
+
+    # Create table rows
+    for row in data:
+        table_html += "<tr>"
+        for value in row.values():
+            table_html += f"<td>{value}</td>"
+        table_html += "</tr>"
+
+    table_html += "</table>"
+
+    return table_html
