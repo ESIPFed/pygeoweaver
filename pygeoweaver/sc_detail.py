@@ -82,7 +82,6 @@ def detail_host(host_id):
         return pd.DataFrame([d])
 
 
-
 def get_process_code(process_id):
     r = requests.post(
         f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
