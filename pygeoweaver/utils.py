@@ -1,12 +1,19 @@
+import json
 import os
 import sys
 import shutil
 import logging
 import subprocess
+
+import pandas as pd
 import requests
 import platform
 
 from IPython import get_ipython
+import ipywidgets as widgets
+from IPython.display import display, HTML
+
+from pygeoweaver import GEOWEAVER_DEFAULT_ENDPOINT_URL
 
 
 def get_home_dir():
@@ -171,3 +178,25 @@ def create_table(data, max_length=100):
     table_html += "</table>"
 
     return table_html
+
+
+def get_detail(id, type):
+    if not id:
+        raise RuntimeError("Workflow id is missing")
+    download_geoweaver_jar()
+    url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail"
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    form_data = {'type': type, 'id': id}
+    d = requests.post(url=url, data=form_data, headers=headers)
+    d = d.json()
+    d['nodes'] = json.loads(d['nodes'])
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' in get_ipython().config:
+            table_html = create_table([d])
+            table_output = widgets.Output()
+            with table_output:
+                display(HTML(table_html))
+            display(table_output)
+    except:
+        return pd.DataFrame([d])
