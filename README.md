@@ -78,8 +78,8 @@ Alternatively, you can import a workflow by specifying the path to the workflow 
 7. **Viewing Workflow and Process History**: To retrieve the history of a workflow run or a process run, use the respective commands:
 
 ```python
-geoweaver.history("<workflow_history_id>")
-geoweaver.history("<process_history_id>")
+geoweaver.get_workflow_history("<workflow_history_id>")
+geoweaver.get_process_history("<process_history_id>")
 ```
 
 8. **Inspecting Process Source Code**: To view the source code of a process, use the following command:
