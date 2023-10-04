@@ -1,19 +1,12 @@
 """
 Detail subcommand
 """
-import json
-
-import pandas as pd
 import requests
 from pygeoweaver.constants import *
 
 from pygeoweaver.utils import (
-    download_geoweaver_jar,
-    create_table,
     get_detail
 )
-import ipywidgets as widgets
-from IPython.display import display, HTML
 
 
 def detail_workflow(workflow_id):
