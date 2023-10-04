@@ -9,9 +9,7 @@ from pygeoweaver.constants import *
 
 from pygeoweaver.utils import (
     download_geoweaver_jar,
-    get_geoweaver_jar_path,
-    get_java_bin_path,
-    get_root_dir, create_table,
+    create_table,
 )
 import ipywidgets as widgets
 from IPython.display import display, HTML
@@ -48,7 +46,6 @@ def detail_process(process_id):
     form_data = {'type': 'process', 'id': process_id}
     d = requests.post(url=url, data=form_data, headers=headers)
     d = d.json()
-    d['nodes'] = json.loads(d['nodes'])
     try:
         from IPython import get_ipython
         if 'IPKernelApp' in get_ipython().config:
@@ -72,7 +69,7 @@ def detail_host(host_id):
     try:
         from IPython import get_ipython
         if 'IPKernelApp' in get_ipython().config:
-            table_html = create_table([d])
+            table_html = create_table([d.json()])
             table_output = widgets.Output()
             with table_output:
                 display(HTML(table_html))

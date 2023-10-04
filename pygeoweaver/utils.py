@@ -148,20 +148,25 @@ def copy_files(source_folder, destination_folder):
             shutil.copy2(source_file, destination_file)
 
 
-def create_table(data):
+def create_table(data, max_length=100):
     table_html = "<table><tr>"
 
     # Create table headers
-    for key in data[0].keys():
-        table_html += f"<th>{key}</th>"
-    table_html += "</tr>"
-
-    # Create table rows
-    for row in data:
-        table_html += "<tr>"
-        for value in row.values():
-            table_html += f"<td>{value}</td>"
+    if len(data) > 0:
+        for key in data[0].keys():
+            table_html += f"<th>{key}</th>"
         table_html += "</tr>"
+
+        # Create table rows
+        for row in data:
+            table_html += "<tr>"
+            for value in row.values():
+                # Truncate and add ellipses if the value is too long
+                display_value = str(value)[:max_length] + '...' if len(str(value)) > max_length else str(value)
+                table_html += f"<td>{display_value}</td>"
+            table_html += "</tr>"
+    else:
+        table_html += "<td>No Data</td></tr>"
 
     table_html += "</table>"
 
