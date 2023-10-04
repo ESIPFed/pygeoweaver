@@ -2,8 +2,7 @@ import json
 
 import requests
 
-from IPython.core.display_functions import display
-from ipywidgets import HTML
+from IPython.core.display import display, HTML
 
 from pygeoweaver.constants import *
 from pygeoweaver.utils import (
@@ -25,8 +24,8 @@ def list_hosts():
     if ip is not None:
         # Running in a Jupyter Notebook, display as HTML table
         data_json = data.json()
-        table_html, _ = create_table(data_json)
-        display(HTML(table_html))
+        table_html = create_table(data_json)
+        return display(HTML(table_html))
     else:
         # Not running in a Jupyter Notebook, display as Pandas DataFrame
         data_json = data.json()
@@ -45,7 +44,7 @@ def list_processes():
 
     if ip is not None:
         data_json = data.json()
-        table_html, _ = create_table(data_json)
+        table_html = create_table(data_json)
         display(HTML(table_html))
     else:
         data_json = data.json()
@@ -80,7 +79,7 @@ def list_workflows():
 
     if ip is not None:
         data_json = data.json()
-        table_html, _ = create_table(data_json)
+        table_html = create_table(data_json)
         display(HTML(table_html))
     else:
         data_json = data.json()
