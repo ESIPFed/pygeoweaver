@@ -7,7 +7,7 @@ echo "Check Java.."
 touch ~/.bashrc && source ~/.bashrc
 
 echo "Start Geoweaver.."
-nohup java -jar ~/geoweaver.jar > ~/geoweaver.log &
+nohup ~/jdk/jdk-11.0.18+10/bin/java -jar ~/geoweaver.jar > ~/geoweaver.log &
 
 STATUS=0
 counter=0
