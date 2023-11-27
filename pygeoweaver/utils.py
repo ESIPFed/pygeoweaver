@@ -13,8 +13,6 @@ from IPython import get_ipython
 import ipywidgets as widgets
 from IPython.display import display, HTML
 
-from pygeoweaver import GEOWEAVER_DEFAULT_ENDPOINT_URL
-
 
 def get_home_dir():
     return os.path.expanduser("~")
@@ -181,6 +179,10 @@ def create_table(data, max_length=100):
 
 
 def get_detail(id, type):
+
+
+    from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
+
     if not id:
         raise RuntimeError("Workflow id is missing")
     download_geoweaver_jar()

@@ -2,7 +2,6 @@
 Detail subcommand
 """
 import requests
-from pygeoweaver.constants import *
 
 from pygeoweaver.utils import (
     get_detail
@@ -22,6 +21,7 @@ def detail_host(host_id):
 
 
 def get_process_code(process_id):
+    from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
     r = requests.post(
         f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
         data={"type": "process", "id": process_id},
