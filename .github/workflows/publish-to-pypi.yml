@@ -3,7 +3,25 @@ name: Publish PyGeoweaver Python 🐍 distributions 📦 to PyPI and TestPyPI
 on: push
 
 jobs:
+  test-installation:
+    name: Test Python Installation for 3.8, 3.9, 3.10, 3.11
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, 3.10, 3.11]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version ${{ matrix.python-version }}
+      - name: Install pygeoweaver
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
   build-n-publish:
+    needs: test-installation
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
     runs-on: ubuntu-latest
     steps:
