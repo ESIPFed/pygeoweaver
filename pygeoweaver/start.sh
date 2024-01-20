@@ -4,7 +4,7 @@ echo "Stop running Geoweaver if any.."
 pkill -f geoweaver.jar
 
 echo "Checking Java..."
-if [! -f ~/.bashrc ]; then
+if [ ! -f ~/.bashrc ]; then
         touch ~/.bashrc
 fi
 source ~/.bashrc
