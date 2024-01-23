@@ -1,2 +1,2 @@
-include *.sh
-include *.bat
+include pygeoweaver/*.sh
+include pygeoweaver/*.bat
