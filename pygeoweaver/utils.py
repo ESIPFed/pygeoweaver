@@ -1,12 +1,17 @@
+import json
 import os
 import sys
 import shutil
 import logging
 import subprocess
+
+import pandas as pd
 import requests
 import platform
 
 from IPython import get_ipython
+import ipywidgets as widgets
+from IPython.display import display, HTML
 
 
 def get_home_dir():
@@ -146,3 +151,54 @@ def copy_files(source_folder, destination_folder):
             )
             os.makedirs(os.path.dirname(destination_file), exist_ok=True)
             shutil.copy2(source_file, destination_file)
+
+
+def create_table(data, max_length=100):
+    table_html = "<table><tr>"
+
+    # Create table headers
+    if len(data) > 0:
+        for key in data[0].keys():
+            table_html += f"<th>{key}</th>"
+        table_html += "</tr>"
+
+        # Create table rows
+        for row in data:
+            table_html += "<tr>"
+            for value in row.values():
+                # Truncate and add ellipses if the value is too long
+                display_value = str(value)[:max_length] + '...' if len(str(value)) > max_length else str(value)
+                table_html += f"<td>{display_value}</td>"
+            table_html += "</tr>"
+    else:
+        table_html += "<td>No Data</td></tr>"
+
+    table_html += "</table>"
+
+    return table_html
+
+
+def get_detail(id, type):
+
+
+    from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
+
+    if not id:
+        raise RuntimeError("Workflow id is missing")
+    download_geoweaver_jar()
+    url = f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail"
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    form_data = {'type': type, 'id': id}
+    d = requests.post(url=url, data=form_data, headers=headers)
+    d = d.json()
+    d['nodes'] = json.loads(d['nodes'])
+    try:
+        from IPython import get_ipython
+        if 'IPKernelApp' in get_ipython().config:
+            table_html = create_table([d])
+            table_output = widgets.Output()
+            with table_output:
+                display(HTML(table_html))
+            display(table_output)
+    except:
+        return pd.DataFrame([d])
