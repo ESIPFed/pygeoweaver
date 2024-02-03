@@ -27,4 +27,4 @@ dependencies = [
 Homepage = "https://github.com/ESIPFed/pygeoweaver"
 
 [project.scripts]
-gw = "pygeoweaver:__main__"
+geoweaver = "pygeoweaver.__main__:geoweaver"
