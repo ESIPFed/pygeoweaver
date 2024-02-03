@@ -28,10 +28,12 @@ def start(force=False):
     check_java()
 
     if check_os() == 3:
+        logger.debug(f"Detected Windows, running {get_module_absolute_path()}/start.bat")
         subprocess.run(
             [f"{get_module_absolute_path()}/start.bat"], cwd=f"{get_root_dir()}/"
         )
     else:
+        logger.debug(f"Detected Linux/MacOs, running {get_module_absolute_path()}/start.sh")
         subprocess.run(
             [f"{get_module_absolute_path()}/start.sh"], cwd=f"{get_root_dir()}/"
         )

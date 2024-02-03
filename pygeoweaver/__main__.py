@@ -2,6 +2,7 @@
 The main function of pygeoweaver
 To run in CLI mode. 
 """
+import click
 from pygeoweaver import (
     detail_host,
     detail_process,
@@ -19,7 +20,56 @@ from pygeoweaver import (
     run_workflow,
     helpwith,
 )
+from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.server import show
+
+
+@click.group()
+def geoweaver():
+    """
+    Geoweaver CLI: A tool for managing workflows and processes.
+    """
+    pass
+
+
+@geoweaver.command("start")
+@click.option('--force', is_flag=True, help='Force overwrite the Geoweaver JAR file if it already exists.')
+def start_command(force):
+    """
+    Start the Geoweaver application.
+    """
+    start(force)
+
+
+@geoweaver.command("stop")
+def stop_command():
+    """
+    Start the Geoweaver application.
+    """
+    stop()
+
+@geoweaver.command("show")
+@click.option('--geoweaver-url', default=GEOWEAVER_DEFAULT_ENDPOINT_URL, help='Geoweaver URL (default is GEOWEAVER_DEFAULT_ENDPOINT_URL)')
+def show_command(geoweaver_url):
+    """
+    Show graphical user interface of Geoweaver in browser
+
+    Args:
+        geoweaver_url (_type_): _description_
+    """
+    show(geoweaver_url)
+
+
+@geoweaver.group("create")
+def create_command():
+    """
+    Create commands for Geoweaver.
+    """
+    pass
+
+
+
+
 
 
 def main():
@@ -61,4 +111,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    geoweaver()
