@@ -28,3 +28,4 @@ Homepage = "https://github.com/ESIPFed/pygeoweaver"
 
 [project.scripts]
 geoweaver = "pygeoweaver.__main__:geoweaver"
+gw = "pygeoweaver.__main__:geoweaver"
