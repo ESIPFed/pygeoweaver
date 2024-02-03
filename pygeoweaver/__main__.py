@@ -216,7 +216,7 @@ def get_process_by_name_command(process_name):
     :param process_name: The name of the process.
     :type process_name: str
     """
-    get_process_by_name(process_name)
+    return get_process_by_name(process_name)
 
 
 @find_command.command("id")
@@ -228,7 +228,7 @@ def get_process_by_id_command(process_id):
     :param process_id: The ID of the process.
     :type process_id: str
     """
-    get_process_by_id(process_id)
+    return get_process_by_id(process_id)
     
     
 @find_command.command("language")
@@ -240,7 +240,7 @@ def get_process_by_language_command(language):
     :param language: The programming language of the processes.
     :type language: str
     """
-    get_process_by_language(language)
+    return get_process_by_language(language)
 
 
 def main():

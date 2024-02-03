@@ -2,6 +2,8 @@ import requests
 from pygeoweaver.constants import *
 import pandas as pd
 
+from pygeoweaver.utils import check_ipython
+
 
 def get_process_by_name(process_name):
     """
@@ -24,6 +26,8 @@ def get_process_by_name(process_name):
     pd.set_option("display.max_rows", None)  # Display all rows
     pd.set_option("display.expand_frame_repr", False)  # Prevent truncation of columns
     pd.DataFrame(matching_processes)
+    if not check_ipython():
+        return pd.DataFrame(matching_processes)
 
 
 def get_process_by_id(process_id):
@@ -47,6 +51,8 @@ def get_process_by_id(process_id):
     pd.set_option("display.max_rows", None)  # Display all rows
     pd.set_option("display.expand_frame_repr", False)  # Prevent truncation of columns
     pd.DataFrame(matching_processes)
+    if not check_ipython():
+        return pd.DataFrame(matching_processes)
 
 
 def get_process_by_language(language):
@@ -70,3 +76,5 @@ def get_process_by_language(language):
     pd.set_option("display.max_rows", None)  # Display all rows
     pd.set_option("display.expand_frame_repr", False)  # Prevent truncation of columns
     pd.DataFrame(matching_processes)
+    if not check_ipython():
+        return pd.DataFrame(matching_processes)
