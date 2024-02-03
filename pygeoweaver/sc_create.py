@@ -141,3 +141,8 @@ def create_workflow(
         return pd.DataFrame(json.loads(data_json).items(), columns=["Key", "Value"])
     else:
         return r.json()
+
+
+def create_workflow_from_file():
+    raise Exception("Creating workflow from file is not implemented yet.")
+

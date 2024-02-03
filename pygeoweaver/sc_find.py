@@ -4,6 +4,12 @@ import pandas as pd
 
 
 def get_process_by_name(process_name):
+    """
+    Get processes by their name.
+
+    :param process_name: The name of the process.
+    :type process_name: str
+    """
     response = requests.post(
         f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
     )
@@ -21,6 +27,12 @@ def get_process_by_name(process_name):
 
 
 def get_process_by_id(process_id):
+    """
+    Get a process by its ID.
+
+    :param process_id: The ID of the process.
+    :type process_id: str
+    """
     response = requests.post(
         f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
     )
@@ -38,6 +50,12 @@ def get_process_by_id(process_id):
 
 
 def get_process_by_language(language):
+    """
+    Get processes by their programming language.
+
+    :param language: The programming language of the processes.
+    :type language: str
+    """
     response = requests.post(
         f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/list", data={"type": "process"}
     )
