@@ -24,6 +24,9 @@ from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.sc_create import create_process, create_process_from_file, create_workflow
 from pygeoweaver.sc_detail import get_process_code
 from pygeoweaver.sc_find import get_process_by_id, get_process_by_language, get_process_by_name
+from pygeoweaver.sc_history import get_process_history, get_workflow_history
+from pygeoweaver.sc_list import list_processes_in_workflow
+from pygeoweaver.sc_sync import sync, sync_workflow
 from pygeoweaver.server import show
 
 
@@ -241,6 +244,238 @@ def get_process_by_language_command(language):
     :type language: str
     """
     return get_process_by_language(language)
+
+@geoweaver.group("history")
+def history_command():
+    """
+    history commands for Geoweaver.
+    """
+    pass
+
+@history_command.command("show")
+@click.argument('history_id', type=str)
+def show_history_command(history_id):
+    """
+    Show history for a workflow or process.
+
+    :param history_id: The ID of the history.
+    :type history_id: str
+    """
+    show_history(history_id)
+    
+    
+@history_command.command("get_process")
+@click.argument('process_id', type=str)
+def get_process_history_command(process_id):
+    """
+    Get list of history for a process using process id.
+
+    :param process_id: The ID of the process.
+    :type process_id: str
+    """
+    get_process_history(process_id)
+
+
+@history_command.command("get_workflow")
+@click.argument('workflow_id', type=str)
+def get_workflow_history_command(workflow_id):
+    """
+    Get list of history for a workflow using workflow id.
+
+    :param workflow_id: The ID of the workflow.
+    :type workflow_id: str
+    """
+    get_workflow_history(workflow_id)
+
+
+@geoweaver.group("import")
+def import_command():
+    """
+    import commands for Geoweaver.
+    """
+    pass
+
+@import_command.command("workflow")
+@click.argument('workflow_zip_file_path', type=click.Path(exists=True, dir_okay=False))
+def import_workflow_command(workflow_zip_file_path):
+    """
+    Import a workflow from a zip file.
+
+    :param workflow_zip_file_path: The path to the Geoweaver workflow zip file.
+    :type workflow_zip_file_path: str
+    """
+    import_workflow(workflow_zip_file_path)
+
+
+@geoweaver.group("list")
+def list_command():
+    """
+    list commands for Geoweaver.
+    """
+    pass
+
+
+@list_command.command("host")
+def list_hosts_command():
+    """
+    List all hosts in Geoweaver.
+
+    Downloads the Geoweaver JAR, then runs the 'list' command with the '--host' option.
+
+    Note: Requires Geoweaver to be initialized and the JAR file to be available.
+    """
+    list_hosts()
+
+
+@list_command.command("process")
+def list_processes_command():
+    """
+    List all processes in Geoweaver.
+
+    Downloads the Geoweaver JAR, ensures executable permissions, and then runs the 'list' command with the '--process' option.
+
+    Note: Requires Geoweaver to be initialized and the JAR file to be available.
+    """
+    list_processes()
+
+
+@list_command.command()
+@click.argument('workflow_id', type=str)
+def list_processes_in_workflow_command(workflow_id):
+    """
+    List processes in a specific workflow.
+
+    Downloads the Geoweaver JAR and queries the Geoweaver server for details of a workflow.
+    Extracts information about nodes in the workflow and returns a list of dictionaries containing 'title' and 'id'.
+
+    :param workflow_id: The ID of the workflow.
+    :type workflow_id: str
+    :return: List of dictionaries containing 'title' and 'id' of processes in the workflow.
+    :rtype: list
+    """
+    list_processes_in_workflow(workflow_id)
+
+
+@list_command.command("workflow")
+def list_workflows_command():
+    """
+    List all workflows in Geoweaver.
+
+    Downloads the Geoweaver JAR, then runs the 'list' command with the '--workflow' option.
+
+    Note: Requires Geoweaver to be initialized and the JAR file to be available.
+    """
+    list_workflows()
+
+
+@geoweaver.group("run")
+def run_command():
+    """
+    Run commands for Geoweaver.
+    """
+    pass
+
+
+@run_command.command()
+@click.option('--process-id', required=True, type=str, help='ID of the process.')
+@click.option('--host-id', required=True, type=str, help='ID of the host.')
+@click.option('--password', type=str, help='Password for authentication.')
+@click.option('--environment', type=str, help='Environment for the process.')
+@click.option('--sync-path', type=click.Path(exists=True), help='Path for synchronization.')
+def run_process_command(process_id, host_id, password, environment, sync_path):
+    """
+    Run a process.
+
+    Args:
+        --process-id: ID of the process. (required)
+        --host-id: ID of the host. (required)
+        --password: Password for authentication. (optional)
+        --environment: Environment for the process. (optional)
+        --sync-path: Path for synchronization. (optional)
+    """
+    run_process(
+        process_id=process_id,
+        host_id=host_id,
+        password=password,
+        environment=environment,
+        sync_path=sync_path,
+    )
+
+
+@run_command.command()
+@click.argument('workflow_id', type=str)
+@click.option('--workflow-folder-path', '-d', type=str, help='Geoweaver workflow folder path.')
+@click.option('--workflow-zip-file-path', '-f', type=str, help='Path to workflow zip file.')
+@click.option('--environments', '-e', type=str, help='Environments to run on. List of environment ids with comma as separator.')
+@click.option('--hosts', '-h', type=str, help='Hosts to run on. List of host ids with comma as separator.')
+@click.option('--passwords', '-p', type=str, help='Passwords to the target hosts. List of passwords with comma as separator.')
+@click.option('--sync-path', type=click.Path(exists=True), help='Path for synchronization.')
+def run_workflow_command(workflow_id, workflow_folder_path, workflow_zip_file_path, environments, hosts, passwords, sync_path):
+    """
+    Run a workflow.
+
+    Args:
+        <workflow_id>: Workflow ID to run.
+        -d, --workflow-folder-path: Geoweaver workflow folder path. (optional)
+        -f, --workflow-zip-file-path: Path to workflow zip file. (optional)
+        -e, --environments: Environments to run on. List of environment ids with comma as separator. (optional)
+        -h, --hosts: Hosts to run on. List of host ids with comma as separator. (optional)
+        -p, --passwords: Passwords to the target hosts. List of passwords with comma as separator. (optional)
+    """
+    run_workflow(
+        workflow_id=workflow_id,
+        workflow_folder_path=workflow_folder_path,
+        workflow_zip_file_path=workflow_zip_file_path,
+        environment_list=environments,
+        host_list=hosts,
+        password_list=passwords,
+        sync_path=sync_path,
+    )
+
+
+@geoweaver.group("sync")
+def sync_command():
+    """
+    sync commands for Geoweaver.
+    """
+    pass
+
+@sync_command.command("process")
+@click.option('--process-id', required=True, type=str, help='The ID of the Geoweaver process.')
+@click.option('--local-path', required=True, type=click.Path(exists=True, file_okay=True, dir_okay=True),
+              help='The local path to save or load the process code.')
+@click.option('--direction', required=True, type=click.Choice(['download', 'upload'], case_sensitive=False),
+              help='The direction of the sync, either "download" or "upload".')
+def sync_command(process_id: str, local_path: typing.Union[str, os.PathLike], direction: str):
+    """
+    Sync code for a Geoweaver process between the local machine and the Geoweaver server.
+
+    :param process_id: The ID of the Geoweaver process.
+    :type process_id: str
+    :param local_path: The local path to save or load the process code.
+    :type local_path: Union[str, os.PathLike]
+    :param direction: The direction of the sync, either "download" or "upload".
+    :type direction: str
+    """
+    sync(process_id, local_path, direction)
+    
+
+@sync_command.command("workflow")
+@click.option('--workflow-id', required=True, type=str, help='The ID of the Geoweaver workflow.')
+@click.option('--sync-to-path', required=True, type=click.Path(exists=True, file_okay=False, dir_okay=True),
+              help='The local path to sync the Geoweaver workflow.')
+def sync_workflow_command(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]):
+    """
+    Sync a Geoweaver workflow, including its code and history, between the local machine and the Geoweaver server.
+
+    :param workflow_id: The ID of the Geoweaver workflow.
+    :type workflow_id: str
+    :param sync_to_path: The local path to sync the Geoweaver workflow.
+    :type sync_to_path: Union[str, os.PathLike]
+    """
+    sync_workflow(workflow_id, sync_to_path)
+
+
 
 
 def main():

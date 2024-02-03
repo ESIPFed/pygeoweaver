@@ -13,6 +13,16 @@ from pygeoweaver.utils import (
 
 
 def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction: str):
+    """
+    Sync code for a Geoweaver process between the local machine and the Geoweaver server.
+
+    :param process_id: The ID of the Geoweaver process.
+    :type process_id: str
+    :param local_path: The local path to save or load the process code.
+    :type local_path: Union[str, os.PathLike]
+    :param direction: The direction of the sync, either "download" or "upload".
+    :type direction: str
+    """
     print(f"Proceeding with {direction}\n")
     if direction == "download":
         if not local_path:
@@ -60,8 +70,15 @@ def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction:
             "Please specify the direction to sync. Choices - [UPLOAD, DOWNLOAD]"
         )
 
-
 def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]):
+    """
+    Sync a Geoweaver workflow, including its code and history, between the local machine and the Geoweaver server.
+
+    :param workflow_id: The ID of the Geoweaver workflow.
+    :type workflow_id: str
+    :param sync_to_path: The local path to sync the Geoweaver workflow.
+    :type sync_to_path: Union[str, os.PathLike]
+    """
     download_geoweaver_jar()
     # download workflow
     r = requests.post(

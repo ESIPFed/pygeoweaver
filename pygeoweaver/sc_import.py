@@ -30,4 +30,4 @@ def import_workflow(workflow_zip_file_path):
     )
 
 def import_workflow_from_github(git_repo_url):
-    pass
+    raise Exception("This feature is not implemented yet")

@@ -6,6 +6,7 @@ taskkill /f /im geoweaver.exe > nul
 echo Check Java..
 
 echo Start Geoweaver..
+echo javaw -jar "%USERPROFILE%\geoweaver.jar"
 start /b javaw -jar "%USERPROFILE%\geoweaver.jar"
 
 set STATUS=0
