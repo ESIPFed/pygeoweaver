@@ -2,6 +2,8 @@
 The main function of pygeoweaver
 To run in CLI mode. 
 """
+import os
+import typing
 import click
 from pygeoweaver import (
     detail_host,
@@ -446,7 +448,7 @@ def sync_command():
               help='The local path to save or load the process code.')
 @click.option('--direction', required=True, type=click.Choice(['download', 'upload'], case_sensitive=False),
               help='The direction of the sync, either "download" or "upload".')
-def sync_command(process_id: str, local_path: typing.Union[str, os.PathLike], direction: str):
+def sync_process_command(process_id: str, local_path: typing.Union[str, os.PathLike], direction: str):
     """
     Sync code for a Geoweaver process between the local machine and the Geoweaver server.
 
@@ -474,46 +476,6 @@ def sync_workflow_command(workflow_id: str, sync_to_path: typing.Union[str, os.P
     :type sync_to_path: Union[str, os.PathLike]
     """
     sync_workflow(workflow_id, sync_to_path)
-
-
-
-
-def main():
-    # start geoweaver
-    # start()
-    # stop geoweaver
-    # stop()
-    # list resources
-    # list_hosts()
-    # list_processes()
-    # list_workflows()
-    # show history
-    # show_history("ll3u3W78eOEfklxhBJ")
-    # detail host
-    # detail_host("100001")
-    # detail process
-    # detail_process("7pxu8c")
-    # detail_workflow("5jnhcrq33znbu2mue9v2")
-    # import workflow
-    # import_workflow("/Users/joe/Downloads/gr3ykr8dynu12vrwq11oy.zip")
-    # export workflow
-    # export_workflow("gr3ykr8dynu12vrwq11oy", "4", "/Users/joe/Downloads/test_pygeoweaver_export.zip")
-    # run process
-    # run_process(process_id="7zwnvx", host_id="100001", )
-    # run workflow by id
-    # run_worklfow(workflow_id="9sszomwhiiusakodb1ft", host_list="100001", password_list="xxx",
-    #              environment_list="",)
-    # run_workflow(workflow_id="9sszomwhiiusakodb1ft", host_list="100001", )
-    # run workflow by zip path
-
-    # run workflow by folder path
-
-    # reset localhost password for Geoweaver
-    # reset_password()
-    # show()
-    # helpwith()
-    # check_java()
-    pass
 
 
 if __name__ == "__main__":
