@@ -4,6 +4,7 @@ import subprocess
 import shutil
 import sys
 import tarfile
+import winreg
 import zipfile
 import urllib.request
 
@@ -109,7 +110,36 @@ def extract_zip_archive(archive_path, destination_dir):
     print(f"{archive_path} extracted to {destination_dir}.")
 
 
-def set_jdk_env_vars(jdk_install_dir):
+def set_jdk_env_vars_for_windows(jdk_install_dir):
+    print(f"Setting JDK environment variables...")
+    java_bin = os.path.join(jdk_install_dir, "bin")
+
+    # Append JAVA_HOME to the user's PATH environment variable
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as regkey:
+            current_path = winreg.QueryValueEx(regkey, "PATH")[0]
+            if java_bin not in current_path:
+                new_path = f"{current_path};{java_bin}"
+                winreg.SetValueEx(regkey, "PATH", 0, winreg.REG_EXPAND_SZ, new_path)
+                print("Added JDK bin directory to PATH.")
+    except Exception as e:
+        print(f"Error adding JDK bin directory to PATH: {e}")
+
+    # Set JAVA_HOME environment variable
+    # try:
+    #     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as regkey:
+    #         winreg.SetValueEx(regkey, "JAVA_HOME", 0, winreg.REG_EXPAND_SZ, jdk_install_dir)
+    #         print("Set JAVA_HOME environment variable.")
+    # except Exception as e:
+    #     print(f"Error setting JAVA_HOME environment variable: {e}")
+
+    # Update the environment variables of the current process
+    # subprocess.call(["setx", "JAVA_HOME", java_home])
+    subprocess.call(["setx", "PATH", ";".join([current_path, java_bin])])
+    print("JDK environment variables set.")
+
+
+def set_jdk_env_vars_for_linux_mac(jdk_install_dir):
     print(f"Setting JDK environment variables...")
     java_line = f'\nexport JAVA_HOME="{jdk_install_dir}"\n'
 
@@ -127,6 +157,13 @@ def set_jdk_env_vars(jdk_install_dir):
             print("JDK environment variables set.")
 
     subprocess.run(["bash", "-c", "source ~/.bashrc"])
+
+
+def set_jdk_env_vars(jdk_install_dir):
+    if platform.system == "Windows":
+        set_jdk_env_vars_for_windows(jdk_install_dir)
+    else:
+        set_jdk_env_vars_for_linux_mac(jdk_install_dir)
 
 
 def install_java():
