@@ -35,15 +35,20 @@ def get_java_bin_from_which():
 
     if system == "Darwin" or system == "Linux":
         try:
-            java_bin_sh = f"{get_root_dir()}/java_bin.sh"
-            os.chmod(java_bin_sh, 0o755)
-            output = subprocess.check_output([java_bin_sh], encoding="utf-8")
-            java_bin_path = output.strip()
+            # Source ~/.bashrc (Assuming it's a non-login shell)
+            bashrc_path = os.path.expanduser("~/.bashrc")
+            subprocess.run(["bash", "-c", f"source {bashrc_path}"])
+
+            # Check the location of Java executable
+            result = subprocess.run(["which", "java"], capture_output=True, text=True)
+            java_bin_path = result.stdout.strip()
         except subprocess.CalledProcessError as e:
             print(f"Command execution failed: {e.output}")
             return None
     elif system == "Windows":
-        print("Unsupported platform for windows yet.")
+        # Check the location of Java executable
+        result = subprocess.run(["where", "java"], capture_output=True, text=True)
+        java_bin_path = result.stdout.strip()
     else:
         print("Unsupported platform.")
 
@@ -54,7 +59,8 @@ def get_java_bin_path():
     """
     Get the path of the Java binary.
     """
-    if sys.platform.startswith("win"):  # Windows
+    system = platform.system()
+    if system == "Windows":  # Windows
         java_exe = "java.exe"
     else:
         java_exe = "java"
@@ -69,6 +75,7 @@ def get_java_bin_path():
 
     if java_bin_path is None:
         java_bin_path = get_java_bin_from_which()
+        
 
     return java_bin_path
 
