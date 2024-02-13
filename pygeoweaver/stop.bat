@@ -2,6 +2,6 @@
 
 echo Stopping Geoweaver...
 
-taskkill /f /im javaw.exe > nul
+taskkill /f /im java.exe > nul
 
 echo Geoweaver stopped successfully.

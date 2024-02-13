@@ -108,7 +108,7 @@ def download_geoweaver_jar(overwrite=False):
                 subprocess.run(
                     ["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/"
                 )
-                return
+            return
 
     print("Downloading latest version of Geoweaver...")
     geoweaver_url = (

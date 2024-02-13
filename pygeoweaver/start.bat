@@ -16,6 +16,7 @@ where java > nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     rem Java command not found in PATH, check JDK folder in home directory
     set "jdk_home=%home_dir%\jdk\jdk-11.0.18+10"  REM Change this to your JDK installation directory
+    echo Check jdk_home %jdk_home%
     if exist "%jdk_home%\bin\java.exe" (
         set "java_cmd=%jdk_home%\bin\java.exe"
         echo Java command found in JDK directory: %java_cmd%
