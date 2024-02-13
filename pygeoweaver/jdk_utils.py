@@ -111,17 +111,22 @@ def extract_zip_archive(archive_path, destination_dir):
 
 
 def set_jdk_env_vars_for_windows(jdk_install_dir):
-    print(f"Setting JDK environment variables...")
+    print(f"Setting JDK environment variables for Windows...")
     java_bin = os.path.join(jdk_install_dir, "bin")
 
     # Append JAVA_HOME to the user's PATH environment variable
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as regkey:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
+                            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", 
+                            0, winreg.KEY_ALL_ACCESS) as regkey:
             current_path = winreg.QueryValueEx(regkey, "PATH")[0]
+            print(f"current_path = {current_path}")
             if java_bin not in current_path:
                 new_path = f"{current_path};{java_bin}"
                 winreg.SetValueEx(regkey, "PATH", 0, winreg.REG_EXPAND_SZ, new_path)
-                print("Added JDK bin directory to PATH.")
+                print(f"Added JDK bin directory to PATH: {java_bin}")
+                subprocess.call(["setx", "PATH", ";".join([current_path, java_bin])])
+                print("JDK environment variables set.")
     except Exception as e:
         print(f"Error adding JDK bin directory to PATH: {e}")
 
@@ -135,8 +140,7 @@ def set_jdk_env_vars_for_windows(jdk_install_dir):
 
     # Update the environment variables of the current process
     # subprocess.call(["setx", "JAVA_HOME", java_home])
-    subprocess.call(["setx", "PATH", ";".join([current_path, java_bin])])
-    print("JDK environment variables set.")
+    
 
 
 def set_jdk_env_vars_for_linux_mac(jdk_install_dir):

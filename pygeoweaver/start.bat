@@ -1,13 +1,36 @@
 @echo off
 
 echo Stop running Geoweaver if any..
-taskkill /f /im geoweaver.exe > nul
+taskkill /f /im geoweaver.exe > nul 2>nul
 
-echo Check Java..
+rem Get the user's home directory
+for /f "tokens=1,* delims==" %%A in ('wmic os get UserProfile /value') do (
+    if not "%%A"=="UserProfile" (
+        set "home_dir=%%B"
+    )
+)
+
+rem Check if Java command exists in the system PATH
+echo Check java exists..
+where java > nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    rem Java command not found in PATH, check JDK folder in home directory
+    set "jdk_home=%home_dir%\jdk\jdk-11.0.18+10"  REM Change this to your JDK installation directory
+    if exist "%jdk_home%\bin\java.exe" (
+        set "java_cmd=%jdk_home%\bin\java.exe"
+        echo Java command found in JDK directory: %java_cmd%
+    ) else (
+        echo Java command not found.
+    )
+) else (
+    rem Java command found in PATH
+    echo Java command found: %JAVA_HOME%\bin\java.exe
+    set "java_cmd=java"
+)
 
 echo Start Geoweaver..
-echo javaw -jar "%USERPROFILE%\geoweaver.jar"
-start /b javaw -jar "%USERPROFILE%\geoweaver.jar"
+echo "%java_cmd%" -jar "%USERPROFILE%\geoweaver.jar"
+start /b "" "%java_cmd%" -jar "%USERPROFILE%\geoweaver.jar"
 
 set STATUS=0
 set counter=0
