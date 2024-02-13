@@ -13,7 +13,10 @@ def get_home_dir():
     """
     Get the user's home directory.
     """
-    return os.path.expanduser("~")
+    if platform.system() == "Windows":
+        return os.path.expandvars("%USERPROFILE%")
+    else:
+        return os.path.expanduser("~")
 
 
 def get_root_dir():

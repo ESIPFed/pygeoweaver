@@ -160,7 +160,8 @@ def set_jdk_env_vars_for_linux_mac(jdk_install_dir):
 
 
 def set_jdk_env_vars(jdk_install_dir):
-    if platform.system == "Windows":
+    print(f"Setting environment variables for {platform.system()}")
+    if platform.system() == "Windows":
         set_jdk_env_vars_for_windows(jdk_install_dir)
     else:
         set_jdk_env_vars_for_linux_mac(jdk_install_dir)
