@@ -49,6 +49,7 @@ def get_java_bin_from_which():
         # Check the location of Java executable
         result = subprocess.run(["where", "java"], capture_output=True, text=True)
         java_bin_path = result.stdout.strip()
+        
     else:
         print("Unsupported platform.")
 
@@ -67,15 +68,20 @@ def get_java_bin_path():
 
     java_bin_path = None
 
-    for path in os.environ.get("PATH", "").split(os.pathsep):
-        bin_path = os.path.join(path, java_exe)
-        if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
-            java_bin_path = bin_path
-            break
-
     if java_bin_path is None:
         java_bin_path = get_java_bin_from_which()
         
+    # Get the user's home directory
+    home_dir = os.path.expanduser("~")
+    if java_bin_path == None:
+        # check the local path 
+        jdk_home = os.path.join(home_dir, "jdk", "jdk-11.0.18+10")  # Change this to your JDK installation directory
+        print("Check jdk_home", jdk_home)
+        java_cmd = os.path.join(jdk_home, "bin", "java.exe")
+        if not os.path.exists(java_cmd):
+            print("Java command not found. Install it.")
+        else:
+            java_bin_path = java_cmd
 
     return java_bin_path
 
