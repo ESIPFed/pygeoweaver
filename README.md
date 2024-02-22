@@ -35,12 +35,22 @@ import geoweaver
 geoweaver.start()
 ```
 
+or directly type in Terminal
+```shell
+gw start
+```
+
 This command checks if GeoWeaver is already installed. If not, it will automatically download and install GeoWeaver in your local environment. The GeoWeaver interface will then open in the cell output as an iframe, allowing you to access and utilize all the features provided by GeoWeaver.
 
 2. **Stopping GeoWeaver**: To stop GeoWeaver, use the following command:
 
 ```python
 geoweaver.stop()
+```
+
+or directly type in Terminal
+```shell
+gw stop
 ```
 
 3. **Listing Existing Objects**: To list the existing hosts, processes, and workflows, execute the respective commands:
