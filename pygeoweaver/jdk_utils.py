@@ -4,7 +4,6 @@ import subprocess
 import shutil
 import sys
 import tarfile
-import winreg
 import zipfile
 import urllib.request
 
@@ -116,9 +115,14 @@ def set_jdk_env_vars_for_windows(jdk_install_dir):
 
     # Append JAVA_HOME to the user's PATH environment variable
     try:
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
-                            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", 
-                            0, winreg.KEY_ALL_ACCESS) as regkey:
+        import winreg  # winreg module is only available on windows and should not be globally imported.
+
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+            0,
+            winreg.KEY_ALL_ACCESS,
+        ) as regkey:
             current_path = winreg.QueryValueEx(regkey, "PATH")[0]
             print(f"current_path = {current_path}")
             if java_bin not in current_path:
@@ -140,7 +144,6 @@ def set_jdk_env_vars_for_windows(jdk_install_dir):
 
     # Update the environment variables of the current process
     # subprocess.call(["setx", "JAVA_HOME", java_home])
-    
 
 
 def set_jdk_env_vars_for_linux_mac(jdk_install_dir):
