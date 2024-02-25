@@ -87,6 +87,93 @@ def stop_on_windows():
     print("Geoweaver stopped successfully.")
 
 
+def check_java_exists():
+    # Check if specified Java path exists
+    specified_path = os.path.expanduser("~/jdk/jdk-11.0.18+10/bin/java")
+    if os.path.isfile(specified_path):
+        print(f"Using Java in home directory: {specified_path}")
+        return specified_path
+
+    # Check if default Java exists
+    try:
+        result = subprocess.run(["java", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode == 0:
+            print("Using Java from system..")
+            return "java"
+    except FileNotFoundError:
+        pass
+
+    return None
+
+
+def start_on_mac_linux():
+    # First stop any existing Geoweaver
+    stop_on_mac_linux()
+
+    # Checking Java
+    print("Checking Java...")
+    java_path = check_java_exists()
+
+    if java_path is None:
+        print("Java not found. Exiting...")
+        exit(1)
+
+    # Start Geoweaver
+    print("Start Geoweaver..")
+    cmds = [java_path, "-jar", os.path.expanduser("~/geoweaver.jar")]
+    print("Running ", " ".join(cmds))
+    with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
+        subprocess.Popen(cmds, 
+                         stdout=log_file, 
+                         stderr=subprocess.STDOUT)
+
+    # Wait for Geoweaver to start
+    time.sleep(2)  # Adjust as necessary
+
+    status = 0
+    counter = 0
+    max_counter = 10
+    while counter != max_counter:  # max wait for 20 seconds
+        try:
+            status = requests.get("http://localhost:8070/Geoweaver").status_code
+            print(f"Received code {status}")
+            if status == 302 or status == 200:
+                break
+        except requests.exceptions.ConnectionError:
+            pass  # Connection error, retrying
+        time.sleep(2)
+        counter += 1
+
+    with open(os.path.expanduser("~/geoweaver.log"), 'r') as log_file:
+        print(log_file.read())
+
+    if counter == max_counter:
+        print("Error: Geoweaver is not up")
+        exit(1)
+    else:
+        print("Success: Geoweaver is up")
+        exit(0)
+
+
+def stop_on_mac_linux() -> int:
+    # Stop running Geoweaver if any
+    print("Stop running Geoweaver if any..")
+    subprocess.run(["pkill", "-f", "geoweaver.jar"])
+
+    # Check status
+    status = subprocess.run(["curl", "-s", "-o", "/dev/null", 
+                             "-w", "%{http_code}\n", 
+                             "http://localhost:8070/Geoweaver"], 
+                             capture_output=True, text=True).stdout.strip()
+
+    if status != "302":
+        print("Stopped.")
+        return 0
+    else:
+        print("Error: unable to stop.")
+        return 1
+
+
 def start(force=False):
     download_geoweaver_jar(overwrite=force)
     check_java()
@@ -95,10 +182,11 @@ def start(force=False):
         logger.debug(f"Detected Windows, running start python script..")
         start_on_windows()
     else:
-        logger.debug(f"Detected Linux/MacOs, running {get_module_absolute_path()}/start.sh")
-        subprocess.run(
-            [f"{get_module_absolute_path()}/start.sh"], cwd=f"{get_root_dir()}/"
-        )
+        logger.debug(f"Detected Linux/MacOs, running start python script..")
+        start_on_mac_linux()
+        # subprocess.run(
+        #     [f"{get_module_absolute_path()}/start.sh"], cwd=f"{get_root_dir()}/"
+        # )
 
 
 def stop():
@@ -106,11 +194,12 @@ def stop():
     if check_os() == 3:
         stop_on_windows()
     else:
-        subprocess.run(
-            [f"{get_module_absolute_path()}/stop.sh"],
-            cwd=f"{get_root_dir()}/",
-            shell=True,
-        )
+        # subprocess.run(
+        #     [f"{get_module_absolute_path()}/stop.sh"],
+        #     cwd=f"{get_root_dir()}/",
+        #     shell=True,
+        # )
+        exit(stop_on_mac_linux())
 
 
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
