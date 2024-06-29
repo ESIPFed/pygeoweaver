@@ -30,7 +30,7 @@ def is_interactive():
 
 def get_spinner(text: str, spinner: str):
     if is_interactive():
-        return Spinner(message=text, style=spinner)
+        return Spinner(text=text, style=spinner)
     else:
         return Halo(text=text, spinner=spinner)
 
