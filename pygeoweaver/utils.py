@@ -24,7 +24,7 @@ def safe_exit(code=0):
         pass
     else:
         # Running in a terminal or other environment
-        safe_exit(code)
+        sys.exit(code)
 
 
 def get_home_dir():

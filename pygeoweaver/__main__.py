@@ -64,12 +64,13 @@ def geoweaver():
 
 
 @geoweaver.command("start")
-@click.option('--force', is_flag=True, help='Force overwrite the Geoweaver JAR file if it already exists.')
-def start_command(force):
+@click.option('--force-download', is_flag=True, help='Force overwrite the Geoweaver JAR file if it already exists.')
+@click.option('--force-restart', is_flag=True, help='Force to restart Geoweaver even when it is already running.')
+def start_command(force_download, force_restart):
     """
     Start the Geoweaver application.
     """
-    start(force)
+    start(force_download=force_download, force_restart=force_restart)
 
 
 @geoweaver.command("stop")
