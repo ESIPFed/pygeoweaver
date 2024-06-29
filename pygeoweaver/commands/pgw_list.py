@@ -10,6 +10,7 @@ from pygeoweaver.utils import (
     get_java_bin_path,
     get_root_dir,
     check_ipython,
+    get_spinner,
 )
 import pandas as pd
 from halo import Halo
@@ -26,7 +27,7 @@ def list_hosts():
 
     Note: Requires Geoweaver to be initialized and the JAR file to be available.
     """
-    with Halo(text=f'Find all registered hosts...', spinner='dots'):
+    with get_spinner(text=f'Find all registered hosts...', spinner='dots'):
         download_geoweaver_jar()
         process = subprocess.run(
             [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--host"],
@@ -49,7 +50,7 @@ def list_processes():
 
     Note: Requires Geoweaver to be initialized and the JAR file to be available.
     """
-    with Halo(text=f'Find all registered processes...', spinner='dots'):
+    with get_spinner(text=f'Find all registered processes...', spinner='dots'):
         download_geoweaver_jar()
         subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
         process = subprocess.run(
@@ -77,7 +78,7 @@ def list_processes_in_workflow(workflow_id):
     :return: List of dictionaries containing 'title' and 'id' of processes in the workflow.
     :rtype: list
     """
-    with Halo(text=f'Find all processes in workflow {workflow_id}...', spinner='dots'):
+    with get_spinner(text=f'Find all processes in workflow {workflow_id}...', spinner='dots'):
         download_geoweaver_jar()
         payload = {"id": workflow_id, "type": "workflow"}
         r = requests.post(
@@ -101,7 +102,7 @@ def list_workflows():
 
     Note: Requires Geoweaver to be initialized and the JAR file to be available.
     """
-    with Halo(text=f'Find all registered workflows...', spinner='dots'):
+    with get_spinner(text=f'Find all registered workflows...', spinner='dots'):
         download_geoweaver_jar()
         process = subprocess.run(
             [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--workflow"],

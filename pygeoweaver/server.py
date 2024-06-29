@@ -16,6 +16,7 @@ from pygeoweaver.utils import (
     get_logger,
     get_module_absolute_path,
     get_root_dir,
+    get_spinner,
     safe_exit,
 )
 
@@ -62,10 +63,10 @@ def check_geoweaver_status() -> bool:
 
 def start_on_windows():
     
-    with Halo(text=f'Stop running Geoweaver if any...', spinner='dots'):
+    with get_spinner(text=f'Stop running Geoweaver if any...', spinner='dots'):
         subprocess.run(["taskkill", "/f", "/im", "geoweaver.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    with Halo(text=f'Check if Java is installed...', spinner='dots'):
+    with get_spinner(text=f'Check if Java is installed...', spinner='dots'):
         java_cmd = "java"
         try:
             subprocess.run(["where", "java"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -78,7 +79,7 @@ def start_on_windows():
                 print("Java command not found.")
                 safe_exit(1)
 
-    with Halo(text=f'Starting Geowaever...', spinner='dots'):
+    with get_spinner(text=f'Starting Geowaever...', spinner='dots'):
         geoweaver_jar = os.path.join(home_dir, "geoweaver.jar")
         print(f'"{java_cmd}" -jar "{geoweaver_jar}"')
         subprocess.Popen([java_cmd, "-jar", geoweaver_jar], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_CONSOLE)
@@ -118,7 +119,7 @@ def stop_on_windows():
 
 
 def check_java_exists():
-    with Halo(text=f'Check if Java is installed...', spinner='dots'):
+    with get_spinner(text=f'Check if Java is installed...', spinner='dots'):
         specified_path = os.path.expanduser("~/jdk/jdk-11.0.18+10/bin/java")
         if os.path.isfile(specified_path):
             print(f"Using Java in home directory: {specified_path}")
@@ -149,7 +150,7 @@ def start_on_mac_linux(force_restart=True):
         print("Java not found. Exiting...")
         safe_exit(1)
 
-    with Halo(text=f'Starting Geoweaver...', spinner='dots'):
+    with get_spinner(text=f'Starting Geoweaver...', spinner='dots'):
         # Start Geoweaver
         cmds = [java_path, "-jar", os.path.expanduser("~/geoweaver.jar")]
         logger.info("Running ", " ".join(cmds))
@@ -184,7 +185,7 @@ def start_on_mac_linux(force_restart=True):
 
 
 def stop_on_mac_linux() -> int:
-    with Halo(text=f'Stopping Geoweaver...', spinner='dots'):
+    with get_spinner(text=f'Stopping Geoweaver...', spinner='dots'):
         # Stop running Geoweaver if any
         logger.info("Stop running Geoweaver if any..")
         subprocess.run(["pkill", "-f", "geoweaver.jar"])

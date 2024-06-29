@@ -9,6 +9,7 @@ from pygeoweaver.constants import *
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     copy_files,
+    get_spinner,
 )
 from halo import Halo
 
@@ -24,7 +25,7 @@ def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction:
     :param direction: The direction of the sync, either "download" or "upload".
     :type direction: str
     """
-    with Halo(text=f'Sync Geoweaver process {process_id} from database to local folder {local_path}...', 
+    with get_spinner(text=f'Sync Geoweaver process {process_id} from database to local folder {local_path}...', 
               spinner='dots'):
         print(f"Proceeding with {direction}\n")
         if direction == "download":
@@ -82,7 +83,7 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
     :param sync_to_path: The local path to sync the Geoweaver workflow.
     :type sync_to_path: Union[str, os.PathLike]
     """
-    with Halo(text=f'Sync Geoweaver workflow {workflow_id} from database to local folder {sync_to_path}...', 
+    with get_spinner(text=f'Sync Geoweaver workflow {workflow_id} from database to local folder {sync_to_path}...', 
               spinner='dots'):
         download_geoweaver_jar()
         # download workflow

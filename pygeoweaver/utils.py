@@ -9,6 +9,30 @@ import platform
 from IPython import get_ipython
 from halo import Halo
 from pygeoweaver.constants import GEOWEAVER_URL
+from pygeoweaver.pgw_spinner import Spinner
+
+
+def is_interactive():
+    """
+    Check if the code is running in an interactive environment like Jupyter Notebook.
+    """
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter notebook or qtconsole
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
+
+
+def get_spinner(text: str, spinner: str):
+    if is_interactive():
+        return Spinner(message=text, style=spinner)
+    else:
+        return Halo(text=text, spinner=spinner)
 
 
 def safe_exit(code=0):
@@ -131,7 +155,7 @@ def download_geoweaver_jar(overwrite=False):
     """
     Download the latest version of Geoweaver JAR file.
     """
-    with Halo(text='Checking Geoweaver JAR file...', spinner='dots'):
+    with get_spinner(text='Checking Geoweaver JAR file...', spinner='dots'):
         if check_geoweaver_jar():
             if overwrite:
                 os.remove(get_geoweaver_jar_path())
@@ -143,7 +167,7 @@ def download_geoweaver_jar(overwrite=False):
                     )
                 return
 
-    with Halo(text='Downloading latest version of Geoweaver...', spinner='dots'):
+    with get_spinner(text='Downloading latest version of Geoweaver...', spinner='dots'):
         r = requests.get(GEOWEAVER_URL)
         with open(get_geoweaver_jar_path(), "wb") as f:
             f.write(r.content)

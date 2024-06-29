@@ -32,6 +32,7 @@ from pygeoweaver.commands.pgw_list import list_processes_in_workflow
 from pygeoweaver.commands.pgw_sync import sync, sync_workflow
 from pygeoweaver.server import check_geoweaver_status, show
 from halo import Halo
+from pygeoweaver.utils import get_spinner
 
 
 def setup_logging():
@@ -509,7 +510,7 @@ def status():
     """
     Check the status of Geoweaver.
     """
-    with Halo(text='Checking Geoweaver status...', spinner='dots'):
+    with get_spinner(text='Checking Geoweaver status...', spinner='dots'):
         geoweaver_running = check_geoweaver_status()
     
     if geoweaver_running:

@@ -11,6 +11,7 @@ from pygeoweaver.utils import (
     get_geoweaver_jar_path,
     get_java_bin_path,
     get_root_dir,
+    get_spinner,
 )
 from halo import Halo
 
@@ -31,7 +32,7 @@ def run_process(
         password - optional
         environment - optional
     """
-    with Halo(text=f'Running Geoweaver process {process_id}...', spinner='dots'):
+    with get_spinner(text=f'Running Geoweaver process {process_id}...', spinner='dots'):
         if password is None:
             # prompt to ask for password
             password = getpass.getpass(f"Enter password for host - {host_id}: ")
@@ -95,7 +96,7 @@ def run_workflow(
     -h, --hosts=<hostStrings>  hosts to run on. list of host ids with comma as separator.
     -p, --passwords=<passes>   passwords to the target hosts. list of passwords with comma as separator.
     """
-    with Halo(text=f'Running Geoweaver workflow {workflow_id}...', spinner='dots'):
+    with get_spinner(text=f'Running Geoweaver workflow {workflow_id}...', spinner='dots'):
         download_geoweaver_jar()
 
         if password_list is None:
