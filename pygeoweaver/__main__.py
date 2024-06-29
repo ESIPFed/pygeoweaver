@@ -2,6 +2,7 @@
 The main function of pygeoweaver
 To run in CLI mode. 
 """
+import logging
 import os
 import typing
 import click
@@ -29,7 +30,29 @@ from pygeoweaver.sc_find import get_process_by_id, get_process_by_language, get_
 from pygeoweaver.sc_history import get_process_history, get_workflow_history
 from pygeoweaver.sc_list import list_processes_in_workflow
 from pygeoweaver.sc_sync import sync, sync_workflow
-from pygeoweaver.server import show
+from pygeoweaver.server import check_geoweaver_status, show
+from halo import Halo
+
+
+def setup_logging():
+    log_file = '~/geoweaver.log'
+    log_file = os.path.expanduser(log_file)
+
+    # Ensure the directory for the log file exists, create if not
+    log_dir = os.path.dirname(log_file)
+    os.makedirs(log_dir, exist_ok=True)
+    with open('logging.ini', 'rt') as f:
+        config_str = f.read()
+        config_str = config_str.replace('%(log_file)s', os.path.expanduser(log_file))
+
+    config_file = 'logging_temp.ini'
+    with open(config_file, 'wt') as f:
+        f.write(config_str)
+
+    logging.config.fileConfig(config_file)
+    os.remove(config_file)
+
+setup_logging()
 
 
 @click.group()
@@ -459,6 +482,7 @@ def sync_process_command(process_id: str, local_path: typing.Union[str, os.PathL
     :param direction: The direction of the sync, either "download" or "upload".
     :type direction: str
     """
+    
     sync(process_id, local_path, direction)
     
 
@@ -475,7 +499,23 @@ def sync_workflow_command(workflow_id: str, sync_to_path: typing.Union[str, os.P
     :param sync_to_path: The local path to sync the Geoweaver workflow.
     :type sync_to_path: Union[str, os.PathLike]
     """
+    
     sync_workflow(workflow_id, sync_to_path)
+
+
+@geoweaver.command("status")
+def status():
+    """
+    Check the status of Geoweaver.
+    """
+    with Halo(text='Checking Geoweaver status...', spinner='dots'):
+        geoweaver_running = check_geoweaver_status()
+    
+    if geoweaver_running:
+        click.echo(click.style("Geoweaver is running", fg='green', bold=True))
+    else:
+        click.echo(click.style("Geoweaver is not running", fg='red', bold=True))
+    
 
 
 if __name__ == "__main__":

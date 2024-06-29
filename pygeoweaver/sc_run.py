@@ -5,13 +5,14 @@ import subprocess
 
 import requests
 
+from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
     get_java_bin_path,
     get_root_dir,
 )
-from pygeoweaver.constants import *
+from halo import Halo
 
 
 def run_process(
@@ -30,43 +31,44 @@ def run_process(
         password - optional
         environment - optional
     """
-    if password is None:
-        # prompt to ask for password
-        password = getpass.getpass(f"Enter password for host - {host_id}: ")
+    with Halo(text=f'Running Geoweaver process {process_id}...', spinner='dots'):
+        if password is None:
+            # prompt to ask for password
+            password = getpass.getpass(f"Enter password for host - {host_id}: ")
 
-    if sync_path:
-        if not os.path.exists(sync_path):
-            print("The specified path does nto exists")
-        print("Updating code on workflow with the given file path.\n")
-        f = open(sync_path, "r")
-        context = f.read()
-        f.close()
-        details = requests.post(
-            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
-            data={"type": "process", "id": process_id},
-        ).json()
-        details["code"] = context
-        requests.post(
-            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
-            data=json.dumps(details),
-            headers={"Content-Type": "application/json"},
+        if sync_path:
+            if not os.path.exists(sync_path):
+                print("The specified path does nto exists")
+            print("Updating code on workflow with the given file path.\n")
+            f = open(sync_path, "r")
+            context = f.read()
+            f.close()
+            details = requests.post(
+                f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
+                data={"type": "process", "id": process_id},
+            ).json()
+            details["code"] = context
+            requests.post(
+                f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/edit/process",
+                data=json.dumps(details),
+                headers={"Content-Type": "application/json"},
+            )
+
+        download_geoweaver_jar()
+        subprocess.run(
+            [
+                get_java_bin_path(),
+                "-jar",
+                get_geoweaver_jar_path(),
+                "run",
+                "process",
+                f"--host={host_id}",
+                f"--password={password}",
+                f"--environment={environment}",
+                process_id,
+            ],
+            cwd=f"{get_root_dir()}/",
         )
-
-    download_geoweaver_jar()
-    subprocess.run(
-        [
-            get_java_bin_path(),
-            "-jar",
-            get_geoweaver_jar_path(),
-            "run",
-            "process",
-            f"--host={host_id}",
-            f"--password={password}",
-            f"--environment={environment}",
-            process_id,
-        ],
-        cwd=f"{get_root_dir()}/",
-    )
 
 
 def run_workflow(
@@ -93,81 +95,82 @@ def run_workflow(
     -h, --hosts=<hostStrings>  hosts to run on. list of host ids with comma as separator.
     -p, --passwords=<passes>   passwords to the target hosts. list of passwords with comma as separator.
     """
-    download_geoweaver_jar()
+    with Halo(text=f'Running Geoweaver workflow {workflow_id}...', spinner='dots'):
+        download_geoweaver_jar()
 
-    if password_list is None:
-        # prompt to ask for password
-        password_list = []
-        for host in host_list.split(","):
-            password = getpass.getpass(f"Enter password for host - {host}: ")
-            password_list.append(password)
-    elif len(password_list.split(",")) != len(host_list.split(",")):
-        raise RuntimeError("The password list length doesn't match host list")
+        if password_list is None:
+            # prompt to ask for password
+            password_list = []
+            for host in host_list.split(","):
+                password = getpass.getpass(f"Enter password for host - {host}: ")
+                password_list.append(password)
+        elif len(password_list.split(",")) != len(host_list.split(",")):
+            raise RuntimeError("The password list length doesn't match host list")
 
-    password_list = ",".join(password_list)
-    if sync_path:
-        from . import sync_workflow
+        password_list = ",".join(password_list)
+        if sync_path:
+            from . import sync_workflow
 
-        sync_workflow(workflow_id=workflow_id, sync_to_path=sync_path)
+            sync_workflow(workflow_id=workflow_id, sync_to_path=sync_path)
 
-    if not workflow_id and not workflow_folder_path and not workflow_zip_file_path:
-        raise RuntimeError(
-            "Please provide at least one of the three options: workflow id, "
-            "folder path or zip path"
-        )
+        if not workflow_id and not workflow_folder_path and not workflow_zip_file_path:
+            raise RuntimeError(
+                "Please provide at least one of the three options: workflow id, "
+                "folder path or zip path"
+            )
 
-    if workflow_id and not workflow_folder_path and not workflow_zip_file_path:
-        command = [
-            get_java_bin_path(),
-            "-jar",
-            get_geoweaver_jar_path(),
-            "run",
-            "workflow",
-            workflow_id,
-            "-h",
-            host_list,
-            "-p",
-            password_list,
-        ]
-        if environment_list:
-            command.extend(["-e", environment_list])
-        subprocess.run(command, cwd=f"{get_root_dir()}/")
+        if workflow_id and not workflow_folder_path and not workflow_zip_file_path:
+            command = [
+                get_java_bin_path(),
+                "-jar",
+                get_geoweaver_jar_path(),
+                "run",
+                "workflow",
+                workflow_id,
+                "-h",
+                host_list,
+                "-p",
+                password_list,
+            ]
+            if environment_list:
+                command.extend(["-e", environment_list])
+            subprocess.run(command, cwd=f"{get_root_dir()}/")
 
-    if workflow_folder_path and not workflow_zip_file_path:
-        # command to run workflow from folder
-        command = [
-            get_java_bin_path(),
-            "-jar",
-            get_geoweaver_jar_path(),
-            "run",
-            "workflow",
-            workflow_id,
-            "-d",
-            workflow_folder_path,
-            "-h",
-            host_list,
-            "-p",
-            password_list
-        ]
-        if environment_list:
-            command.extend(["-e", environment_list])
-        subprocess.run(command, cwd=f"{get_root_dir()}/")
+        if workflow_folder_path and not workflow_zip_file_path:
+            # command to run workflow from folder
+            command = [
+                get_java_bin_path(),
+                "-jar",
+                get_geoweaver_jar_path(),
+                "run",
+                "workflow",
+                workflow_id,
+                "-d",
+                workflow_folder_path,
+                "-h",
+                host_list,
+                "-p",
+                password_list
+            ]
+            if environment_list:
+                command.extend(["-e", environment_list])
+            subprocess.run(command, cwd=f"{get_root_dir()}/")
 
-    if not workflow_folder_path and workflow_zip_file_path:
-        command = [
-            get_java_bin_path(),
-            "-jar",
-            get_geoweaver_jar_path(),
-            "run",
-            "workflow",
-            workflow_id,
-            "-f",
-            workflow_zip_file_path,
-            "-h",
-            host_list,
-            "-p",
-            password_list,
-        ]
-        if environment_list:
-            command.extend(["-e", environment_list])
-        subprocess.run(command, cwd=f"{get_root_dir()}/")
+        if not workflow_folder_path and workflow_zip_file_path:
+            command = [
+                get_java_bin_path(),
+                "-jar",
+                get_geoweaver_jar_path(),
+                "run",
+                "workflow",
+                workflow_id,
+                "-f",
+                workflow_zip_file_path,
+                "-h",
+                host_list,
+                "-p",
+                password_list,
+            ]
+            if environment_list:
+                command.extend(["-e", environment_list])
+            subprocess.run(command, cwd=f"{get_root_dir()}/")

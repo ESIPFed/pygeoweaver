@@ -7,6 +7,8 @@ import requests
 import platform
 
 from IPython import get_ipython
+from halo import Halo
+from pygeoweaver.constants import GEOWEAVER_URL
 
 
 def get_home_dir():
@@ -113,30 +115,27 @@ def download_geoweaver_jar(overwrite=False):
     """
     Download the latest version of Geoweaver JAR file.
     """
-    if check_geoweaver_jar():
-        if overwrite:
-            os.remove(get_geoweaver_jar_path())
+    with Halo(text='Checking Geoweaver JAR file...', spinner='dots'):
+        if check_geoweaver_jar():
+            if overwrite:
+                os.remove(get_geoweaver_jar_path())
+            else:
+                system = platform.system()
+                if not system == "Windows":  # Windows files are exec by default
+                    subprocess.run(
+                        ["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/"
+                    )
+                return
+
+    with Halo(text='Downloading latest version of Geoweaver...', spinner='dots'):
+        r = requests.get(GEOWEAVER_URL)
+        with open(get_geoweaver_jar_path(), "wb") as f:
+            f.write(r.content)
+
+        if check_geoweaver_jar():
+            print("Geoweaver.jar is downloaded")
         else:
-            system = platform.system()
-            if not system == "Windows":  # Windows files are exec by default
-                subprocess.run(
-                    ["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/"
-                )
-            return
-
-    print("Downloading latest version of Geoweaver...")
-    geoweaver_url = (
-        "https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar"
-    )
-    r = requests.get(geoweaver_url)
-
-    with open(get_geoweaver_jar_path(), "wb") as f:
-        f.write(r.content)
-
-    if check_geoweaver_jar():
-        print("Geoweaver.jar is downloaded")
-    else:
-        raise RuntimeError("Fail to download geoweaver.jar")
+            raise RuntimeError("Fail to download geoweaver.jar")
 
 
 def check_os():

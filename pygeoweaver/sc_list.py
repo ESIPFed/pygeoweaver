@@ -1,4 +1,5 @@
 import json
+import logging
 
 import requests
 import subprocess
@@ -11,6 +12,10 @@ from pygeoweaver.utils import (
     check_ipython,
 )
 import pandas as pd
+from halo import Halo
+
+
+logger = logging.getLogger(__name__)
 
 
 def list_hosts():
@@ -21,11 +26,19 @@ def list_hosts():
 
     Note: Requires Geoweaver to be initialized and the JAR file to be available.
     """
-    download_geoweaver_jar()
-    subprocess.run(
-        [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--host"],
-        cwd=f"{get_root_dir()}/",
-    )
+    with Halo(text=f'Find all registered hosts...', spinner='dots'):
+        download_geoweaver_jar()
+        process = subprocess.run(
+            [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--host"],
+            cwd=f"{get_root_dir()}/",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+
+    print(process.stdout)
+    if process.stderr:
+        print("=== Error ===")
+        print(process.stderr)
+        logger.error(process.stderr)
 
 
 def list_processes():
@@ -36,12 +49,20 @@ def list_processes():
 
     Note: Requires Geoweaver to be initialized and the JAR file to be available.
     """
-    download_geoweaver_jar()
-    subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
-    subprocess.run(
-        [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--process"],
-        cwd=f"{get_root_dir()}/",
-    )
+    with Halo(text=f'Find all registered processes...', spinner='dots'):
+        download_geoweaver_jar()
+        subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
+        process = subprocess.run(
+            [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--process"],
+            cwd=f"{get_root_dir()}/",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+
+    print(process.stdout)
+    if process.stderr:
+        print("=== Error ===")
+        print(process.stderr)
+        logger.error(process.stderr)
 
 
 def list_processes_in_workflow(workflow_id):
@@ -56,15 +77,16 @@ def list_processes_in_workflow(workflow_id):
     :return: List of dictionaries containing 'title' and 'id' of processes in the workflow.
     :rtype: list
     """
-    download_geoweaver_jar()
-    payload = {"id": workflow_id, "type": "workflow"}
-    r = requests.post(
-        f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail", data=payload
-    )
-    nodes = json.loads(r.json()["nodes"])
-    result = [
-        {"title": item["title"], "id": item["id"].split(".")[0]} for item in nodes
-    ]
+    with Halo(text=f'Find all processes in workflow {workflow_id}...', spinner='dots'):
+        download_geoweaver_jar()
+        payload = {"id": workflow_id, "type": "workflow"}
+        r = requests.post(
+            f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail", data=payload
+        )
+        nodes = json.loads(r.json()["nodes"])
+        result = [
+            {"title": item["title"], "id": item["id"].split(".")[0]} for item in nodes
+        ]
 
     if check_ipython():
         return pd.DataFrame(result)
@@ -79,9 +101,17 @@ def list_workflows():
 
     Note: Requires Geoweaver to be initialized and the JAR file to be available.
     """
-    download_geoweaver_jar()
-    subprocess.run(
-        [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--workflow"],
-        cwd=f"{get_root_dir()}/",
-    )
+    with Halo(text=f'Find all registered workflows...', spinner='dots'):
+        download_geoweaver_jar()
+        process = subprocess.run(
+            [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--workflow"],
+            cwd=f"{get_root_dir()}/",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+    
+    print(process.stdout)
+    if process.stderr:
+        print("=== Error ===")
+        print(process.stderr)
+        logger.error(process.stderr)
 
