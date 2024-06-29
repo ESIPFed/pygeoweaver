@@ -11,6 +11,22 @@ from halo import Halo
 from pygeoweaver.constants import GEOWEAVER_URL
 
 
+def safe_exit(code=0):
+    """
+    Safely exit the script or notebook session.
+
+    Parameters:
+    - code (int): Exit status code (default: 0 for success).
+    """
+    if 'ipykernel' in sys.modules:
+        # Running in Jupyter notebook or IPython
+        # don't exit at all in Jupyter
+        pass
+    else:
+        # Running in a terminal or other environment
+        safe_exit(code)
+
+
 def get_home_dir():
     """
     Get the user's home directory.

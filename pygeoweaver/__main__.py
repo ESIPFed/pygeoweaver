@@ -24,12 +24,12 @@ from pygeoweaver import (
     helpwith,
 )
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
-from pygeoweaver.sc_create import create_process, create_process_from_file, create_workflow
-from pygeoweaver.sc_detail import get_process_code
-from pygeoweaver.sc_find import get_process_by_id, get_process_by_language, get_process_by_name
-from pygeoweaver.sc_history import get_process_history, get_workflow_history
-from pygeoweaver.sc_list import list_processes_in_workflow
-from pygeoweaver.sc_sync import sync, sync_workflow
+from pygeoweaver.commands.pgw_create import create_process, create_process_from_file, create_workflow
+from pygeoweaver.commands.pgw_detail import get_process_code
+from pygeoweaver.commands.pgw_find import get_process_by_id, get_process_by_language, get_process_by_name
+from pygeoweaver.commands.pgw_history import get_process_history, get_workflow_history
+from pygeoweaver.commands.pgw_list import list_processes_in_workflow
+from pygeoweaver.commands.pgw_sync import sync, sync_workflow
 from pygeoweaver.server import check_geoweaver_status, show
 from halo import Halo
 

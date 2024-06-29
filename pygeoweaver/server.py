@@ -16,6 +16,7 @@ from pygeoweaver.utils import (
     get_logger,
     get_module_absolute_path,
     get_root_dir,
+    safe_exit,
 )
 
 """
@@ -75,7 +76,7 @@ def start_on_windows():
             java_cmd = os.path.join(jdk_home, "bin", "java.exe")
             if not os.path.exists(java_cmd):
                 print("Java command not found.")
-                sys.exit(1)
+                safe_exit(1)
 
     with Halo(text=f'Starting Geowaever...', spinner='dots'):
         geoweaver_jar = os.path.join(home_dir, "geoweaver.jar")
@@ -101,13 +102,13 @@ def start_on_windows():
                     with open(log_file, "r") as f:
                         print(f.read())
                     print("Success: Geoweaver is up")
-                    sys.exit(0)
+                    safe_exit(0)
             except Exception as e:
                 # print(f"Error occurred during request: {e}")
                 continue
 
         print("Error: Geoweaver is not up")
-        sys.exit(1)
+        safe_exit(1)
 
 
 def stop_on_windows():
@@ -146,7 +147,7 @@ def start_on_mac_linux(force_restart=True):
     java_path = check_java_exists()
     if java_path is None:
         print("Java not found. Exiting...")
-        sys.exit(1)
+        safe_exit(1)
 
     with Halo(text=f'Starting Geoweaver...', spinner='dots'):
         # Start Geoweaver
@@ -176,10 +177,10 @@ def start_on_mac_linux(force_restart=True):
 
         if counter == max_counter:
             print("Error: Geoweaver is not up")
-            sys.exit(1)
+            safe_exit(1)
         else:
             print("Success: Geoweaver is up")
-            sys.exit(0)
+            safe_exit(0)
 
 
 def stop_on_mac_linux() -> int:
@@ -227,7 +228,7 @@ def stop():
         #     cwd=f"{get_root_dir()}/",
         #     shell=True,
         # )
-        sys.exit(stop_on_mac_linux())
+        safe_exit(stop_on_mac_linux())
 
 
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):

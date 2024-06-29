@@ -1,1 +1,1 @@
-from pygeoweaver.sc_interface import *
+from pygeoweaver.commands.pgw_interface import *

@@ -7,7 +7,7 @@ import tarfile
 import zipfile
 import urllib.request
 
-from pygeoweaver.utils import get_home_dir, get_java_bin_path
+from pygeoweaver.utils import get_home_dir, get_java_bin_path, safe_exit
 
 
 def install_jdk():
@@ -196,7 +196,7 @@ def install_java():
             os.system(f"sudo {package_manager} install -y default-jre default-jdk")
         else:
             print("Package manager not found. Unable to install Java.")
-            sys.exit(1)
+            safe_exit(1)
     elif system == "Windows":
         # note: this requires admin access to the pc, else it will fail saying
         # Access to the path 'C:\ProgramData\chocolatey\lib-bad' is denied.
@@ -208,7 +208,7 @@ def install_java():
         os.system("choco install -y openjdk")
     else:
         print("Unsupported operating system.")
-        sys.exit(1)
+        safe_exit(1)
 
 
 def is_java_installed():

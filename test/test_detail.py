@@ -1,7 +1,7 @@
 from io import StringIO
 import sys
 import unittest
-from pygeoweaver.sc_detail import detail_host, detail_process, detail_workflow
+from pygeoweaver.commands.pgw_detail import detail_host, detail_process, detail_workflow
 from pygeoweaver.utils import get_logger
 
 
