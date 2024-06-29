@@ -10,8 +10,8 @@ from pygeoweaver import start, stop
 import unittest
 
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
+from pygeoweaver.log_config import get_logger
 from pygeoweaver.server import show
-from pygeoweaver.utils import get_logger
 
 
 logger = get_logger(__name__)

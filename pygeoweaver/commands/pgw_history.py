@@ -72,3 +72,8 @@ def get_workflow_history(workflow_id):
             shell=True,
             cwd=f"{get_root_dir()}/",
         )
+
+
+def save_history(code: str = None, status: str = None, log_output: str = None, ):
+    
+    pass

@@ -201,19 +201,6 @@ def check_ipython():
         return False
 
 
-def get_logger(class_name):
-    """
-    Get a logger with the specified class name.
-    """
-    logger = logging.getLogger(class_name)
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    return logger
-
-
 def copy_files(source_folder, destination_folder):
     """
     Copy files from the source folder to the destination folder.

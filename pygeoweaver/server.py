@@ -9,11 +9,11 @@ from halo import Halo
 
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.jdk_utils import check_java
+from pygeoweaver.log_config import get_logger
 from pygeoweaver.utils import (
     check_ipython,
     check_os,
     download_geoweaver_jar,
-    get_logger,
     get_module_absolute_path,
     get_root_dir,
     get_spinner,
