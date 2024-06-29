@@ -1,6 +1,7 @@
 import os
 import socket
 import subprocess
+import sys
 import webbrowser
 import time
 import requests
@@ -46,7 +47,7 @@ def start_on_windows():
         java_cmd = os.path.join(jdk_home, "bin", "java.exe")
         if not os.path.exists(java_cmd):
             print("Java command not found.")
-            exit(1)
+            sys.exit(1)
 
     print("Start Geoweaver..")
     geoweaver_jar = os.path.join(home_dir, "geoweaver.jar")
@@ -72,13 +73,13 @@ def start_on_windows():
                 with open(log_file, "r") as f:
                     print(f.read())
                 print("Success: Geoweaver is up")
-                exit(0)
+                sys.exit(0)
         except Exception as e:
             # print(f"Error occurred during request: {e}")
             continue
 
     print("Error: Geoweaver is not up")
-    exit(1)
+    sys.exit(1)
 
 
 def stop_on_windows():
@@ -116,7 +117,7 @@ def start_on_mac_linux():
 
     if java_path is None:
         print("Java not found. Exiting...")
-        exit(1)
+        sys.exit(1)
 
     # Start Geoweaver
     print("Start Geoweaver..")
@@ -149,10 +150,10 @@ def start_on_mac_linux():
 
     if counter == max_counter:
         print("Error: Geoweaver is not up")
-        exit(1)
+        sys.exit(1)
     else:
         print("Success: Geoweaver is up")
-        exit(0)
+        sys.exit(0)
 
 
 def stop_on_mac_linux() -> int:
@@ -199,7 +200,7 @@ def stop():
         #     cwd=f"{get_root_dir()}/",
         #     shell=True,
         # )
-        exit(stop_on_mac_linux())
+        sys.exit(stop_on_mac_linux())
 
 
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):

@@ -12,3 +12,5 @@ pygeoweaver/__pycache__/server.cpython-39.pyc
 pygeoweaver/__pycache__/utils.cpython-39.pyc
 .coverage
 *.pyc
+.DS_Store
+nohup.out
