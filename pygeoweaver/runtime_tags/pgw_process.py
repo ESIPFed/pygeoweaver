@@ -16,7 +16,7 @@ geoweaver_context = {
 }
 
 
-def geoweaver_process(func):
+def pygeoweaver_process(func):
     
     @wraps(func)
     def wrapper(*args, **kwargs):

@@ -11,7 +11,7 @@ from pygeoweaver.runtime_tags.pgw_process import geoweaver_context
 logger = logging.getLogger(__name__)
 
 
-def geoweaver_workflow(func):
+def pygeoweaver_workflow(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         workflow_name = func.__name__
