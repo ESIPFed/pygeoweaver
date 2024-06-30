@@ -28,7 +28,7 @@ def is_interactive():
         return False      # Probably standard Python interpreter
 
 
-def get_spinner(text: str, spinner: str):
+def get_spinner(text: str, spinner: str = "dots"):
     if is_interactive():
         return Spinner(text=text, style=spinner)
     else:
