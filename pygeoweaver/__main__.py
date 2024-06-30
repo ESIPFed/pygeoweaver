@@ -54,7 +54,7 @@ def start_command(force_download, force_restart):
     """
     Start the Geoweaver application.
     """
-    start(force_download=force_download, force_restart=force_restart)
+    start(force_download=force_download, force_restart=force_restart, exit_on_finish=True)
 
 
 @geoweaver.command("stop")
@@ -62,7 +62,7 @@ def stop_command():
     """
     Start the Geoweaver application.
     """
-    stop()
+    stop(exit_on_finish=True)
 
 @geoweaver.command("show")
 @click.option('--geoweaver-url', default=GEOWEAVER_DEFAULT_ENDPOINT_URL, help='Geoweaver URL (default is GEOWEAVER_DEFAULT_ENDPOINT_URL)')

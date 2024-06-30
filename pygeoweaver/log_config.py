@@ -9,7 +9,11 @@ def setup_logging():
     # Ensure the directory for the log file exists, create if not
     log_dir = os.path.dirname(log_file)
     os.makedirs(log_dir, exist_ok=True)
-    with open('logging.ini', 'rt') as f:
+    # Get the absolute path to the logging.ini file
+    logging_ini_path = os.path.abspath('logging.ini')
+
+    # Open the logging.ini file
+    with open(logging_ini_path, 'rt') as f:
         config_str = f.read()
         config_str = config_str.replace('%(log_file)s', os.path.expanduser(log_file))
 

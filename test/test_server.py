@@ -26,19 +26,19 @@ class TestServer(unittest.TestCase):
             200,
             f"Failed to access URL: {GEOWEAVER_DEFAULT_ENDPOINT_URL}",
         )
-        stop()
+        stop(exit_on_finish=False)
         with self.assertRaises(requests.exceptions.ConnectionError):
             response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL)
 
-        stop()  # stop again should have no issue
+        stop(exit_on_finish=False)  # stop again should have no issue
 
     def test_windows(self):
         with patch("pygeoweaver.server.checkOS") as mock_checkos:
             mock_checkos.return_value = 3
             with self.assertRaises(RuntimeError):
-                start()
+                start(exit_on_finish=False)
             with self.assertRaises(RuntimeError):
-                stop()
+                stop(exit_on_finish=False)
 
     def test_show_gui(self):
         with patch("pygeoweaver.webbrowser.open") as mock_browser_open:

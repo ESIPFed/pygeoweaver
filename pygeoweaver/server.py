@@ -61,7 +61,7 @@ def check_geoweaver_status() -> bool:
         raise ValueError(err_msg)
 
 
-def start_on_windows():
+def start_on_windows(force_restart=False, force_download=False, exit_on_finish=True):
     
     with get_spinner(text=f'Stop running Geoweaver if any...', spinner='dots'):
         subprocess.run(["taskkill", "/f", "/im", "geoweaver.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -103,13 +103,15 @@ def start_on_windows():
                     with open(log_file, "r") as f:
                         print(f.read())
                     print("Success: Geoweaver is up")
-                    safe_exit(0)
+                    if exit_on_finish:
+                        safe_exit(0)
             except Exception as e:
                 # print(f"Error occurred during request: {e}")
                 continue
 
         print("Error: Geoweaver is not up")
-        safe_exit(1)
+        if exit_on_finish:
+            safe_exit(1)
 
 
 def stop_on_windows():
@@ -137,18 +139,17 @@ def check_java_exists():
         return None
 
 
-def start_on_mac_linux(force_restart=True):
-
+def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, exit_on_finish: bool=False):
     if force_restart:
         # First stop any existing Geoweaver
-        stop_on_mac_linux()
+        stop_on_mac_linux(exit_on_finish=exit_on_finish)
 
-    
     # Checking Java
     java_path = check_java_exists()
     if java_path is None:
         print("Java not found. Exiting...")
-        safe_exit(1)
+        if exit_on_finish:
+            safe_exit(1)
 
     with get_spinner(text=f'Starting Geoweaver...', spinner='dots'):
         # Start Geoweaver
@@ -178,13 +179,15 @@ def start_on_mac_linux(force_restart=True):
 
         if counter == max_counter:
             print("Error: Geoweaver is not up")
-            safe_exit(1)
+            if exit_on_finish:
+                safe_exit(1)
         else:
             print("Success: Geoweaver is up")
-            safe_exit(0)
+            if exit_on_finish:
+                safe_exit(0)
 
 
-def stop_on_mac_linux() -> int:
+def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
     with get_spinner(text=f'Stopping Geoweaver...', spinner='dots'):
         # Stop running Geoweaver if any
         logger.info("Stop running Geoweaver if any..")
@@ -204,32 +207,26 @@ def stop_on_mac_linux() -> int:
             return 1
 
 
-def start(force_download=False, force_restart=False):
+def start(force_download=False, force_restart=False, exit_on_finish=True):
     download_geoweaver_jar(overwrite=force_download)
     check_java()
 
     if check_os() == 3:
         logger.debug(f"Detected Windows, running start python script..")
-        start_on_windows(force_restart)
+        start_on_windows(force_restart=force_restart, force_download=force_download, exit_on_finish=exit_on_finish)
     else:
         logger.debug(f"Detected Linux/MacOs, running start python script..")
-        start_on_mac_linux(force_restart)
-        # subprocess.run(
-        #     [f"{get_module_absolute_path()}/start.sh"], cwd=f"{get_root_dir()}/"
-        # )
+        start_on_mac_linux(force_restart=force_restart, force_download=force_download, exit_on_finish=exit_on_finish)
 
 
-def stop():
+def stop(exit_on_finish: bool=False):
     check_java()
     if check_os() == 3:
         stop_on_windows()
     else:
-        # subprocess.run(
-        #     [f"{get_module_absolute_path()}/stop.sh"],
-        #     cwd=f"{get_root_dir()}/",
-        #     shell=True,
-        # )
-        safe_exit(stop_on_mac_linux())
+        exit_code = stop_on_mac_linux()
+        if exit_on_finish:
+            safe_exit(exit_code)
 
 
 def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):

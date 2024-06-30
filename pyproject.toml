@@ -23,6 +23,7 @@ dependencies = [
     "pandas",
     "halo",
     "pydantic",
+    "tabulate",
 ]
 
 [project.urls]
