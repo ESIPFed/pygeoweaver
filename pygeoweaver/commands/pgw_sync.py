@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 import zipfile
 
 import requests
@@ -10,8 +11,36 @@ from pygeoweaver.utils import (
     download_geoweaver_jar,
     copy_files,
     get_spinner,
+    safe_exit,
 )
 from halo import Halo
+
+
+def overwrite_files(source_dir, destination_dir):
+    """
+    Overwrite all files from the source directory to the destination directory.
+    
+    Args:
+        source_dir (str): The source directory path.
+        destination_dir (str): The destination directory path.
+    """
+    if not os.path.exists(source_dir):
+        print(f"Source directory {source_dir} does not exist.")
+        return
+
+    if not os.path.exists(destination_dir):
+        os.makedirs(destination_dir)
+    
+    for item in os.listdir(source_dir):
+        source_path = os.path.join(source_dir, item)
+        destination_path = os.path.join(destination_dir, item)
+        
+        if os.path.isfile(source_path):
+            shutil.copy2(source_path, destination_path)
+        elif os.path.isdir(source_path):
+            if os.path.exists(destination_path):
+                shutil.rmtree(destination_path)
+            shutil.copytree(source_path, destination_path)
 
 
 def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction: str):
@@ -19,11 +48,8 @@ def sync(process_id: str, local_path: typing.Union[str, os.PathLike], direction:
     Sync code for a Geoweaver process between the local machine and the Geoweaver server.
 
     :param process_id: The ID of the Geoweaver process.
-    :type process_id: str
     :param local_path: The local path to save or load the process code.
-    :type local_path: Union[str, os.PathLike]
     :param direction: The direction of the sync, either "download" or "upload".
-    :type direction: str
     """
     with get_spinner(text=f'Sync Geoweaver process {process_id} from database to local folder {local_path}...', 
               spinner='dots'):
@@ -79,9 +105,7 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
     Sync a Geoweaver workflow, including its code and history, between the local machine and the Geoweaver server.
 
     :param workflow_id: The ID of the Geoweaver workflow.
-    :type workflow_id: str
     :param sync_to_path: The local path to sync the Geoweaver workflow.
-    :type sync_to_path: Union[str, os.PathLike]
     """
     with get_spinner(text=f'Sync Geoweaver workflow {workflow_id} from database to local folder {sync_to_path}...', 
               spinner='dots'):
@@ -89,34 +113,32 @@ def sync_workflow(workflow_id: str, sync_to_path: typing.Union[str, os.PathLike]
         # download workflow
         r = requests.post(
             f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/downloadworkflow",
-            data={"id": workflow_id, "option": "workflowwithprocesscodeallhistory"},
-        ).text
-        filename = r.rsplit("/")[-1]
+            data=f"id={workflow_id}&option=workflowwithprocesscodeallhistory",
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+            }
+        )
+        if r.status_code != 200:
+            print("Error: Fail to prepare the workflow folder.")
+            safe_exit(1)
         home_dir = os.path.expanduser("~")
-        tmp_dir = os.path.join(home_dir, "tmp")
-        if not os.path.exists(tmp_dir):
-            os.makedirs(tmp_dir)
-        # unzip the workflow
-        with zipfile.ZipFile(
-            os.path.join(home_dir, "gw-workspace", "temp", filename)
-        ) as ref:
-            ref.extractall(os.path.join(home_dir, "tmp"))
+        source_folder = os.path.join(home_dir, "gw-workspace", "temp", workflow_id)
         # check if target workflow path and the unzipped workflow match
         if not sync_to_path:
             raise Exception(
                 "Please provide path to workflow that you wish to sync code and history"
             )
-        import_id = json.loads(
-            open(os.path.join(home_dir, "tmp", "workflow.json"), "r").read()
-        ).get("id")
-        sync_id = json.loads(
-            open(os.path.join(sync_to_path, "workflow.json"), "r").read()
-        ).get("id")
+        
+        target_workflow_json_path = os.path.join(sync_to_path, "workflow.json")
+        if os.path.exists(target_workflow_json_path):
+            sync_id = json.loads(
+                open(target_workflow_json_path, "r").read()
+            ).get("id")
 
-        if import_id == sync_id:
-            # if they match perform file replace
-            copy_files(
-                source_folder=os.path.join(home_dir, "tmp"), destination_folder=sync_to_path
-            )
-        else:
-            print("Workflow ID mismatch, please check the `sync_to_path` path.")
+            if workflow_id != sync_id:
+                print("Error: Workflow ID mismatch, please check the existing workflow.json in the `sync_to_path` path.")
+                safe_exit(1)
+        copy_files(
+            source_folder=source_folder, destination_folder=sync_to_path
+        )
+        print("Sync is complete.")

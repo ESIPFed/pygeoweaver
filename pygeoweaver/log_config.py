@@ -1,3 +1,4 @@
+import inspect
 import logging
 import os
 
@@ -9,15 +10,19 @@ def setup_logging():
     # Ensure the directory for the log file exists, create if not
     log_dir = os.path.dirname(log_file)
     os.makedirs(log_dir, exist_ok=True)
+    # Get the absolute path of the current script or notebook file
+    current_file = inspect.getfile(inspect.currentframe())
+    current_file_path = os.path.abspath(current_file)
+    current_folder = os.path.dirname(current_file_path)
     # Get the absolute path to the logging.ini file
-    logging_ini_path = os.path.abspath('logging.ini')
+    logging_ini_path = os.path.abspath(f'{current_folder}/logging.ini')
 
     # Open the logging.ini file
     with open(logging_ini_path, 'rt') as f:
         config_str = f.read()
         config_str = config_str.replace('%(log_file)s', os.path.expanduser(log_file))
 
-    config_file = 'logging_temp.ini'
+    config_file = f'{current_folder}/logging_temp.ini'
     with open(config_file, 'wt') as f:
         f.write(config_str)
 
