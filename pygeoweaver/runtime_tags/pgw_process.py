@@ -21,12 +21,9 @@ def geoweaver_process(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         func_name = func.__name__
-        print(f"geoweaver tag captured {func_name}")
         current_file = inspect.getfile(inspect.currentframe())
         current_file = os.path.basename(current_file)
         current_file_without_extension = os.path.splitext(current_file)[0]
-        print(f"Current file name without extension: {current_file_without_extension}")
-        print(f"Current file name: {current_file}")
         try:
             # Capture the source code of the wrapped function
             func_code = inspect.getsource(func)
@@ -34,18 +31,10 @@ def geoweaver_process(func):
             func_code = f"# Source code not available for {func_name}"
 
         geoweaver_process_id = f"{current_file_without_extension}.{func_name}"
-        print("this process id should be unique: ", geoweaver_process_id)
-        
-        # with open(f"{LOG_DIR}/{func_name}_code.py", "w") as code_file:
-        #     code_file.write(func_code)
-
-        #log_file_path = get_log_file_path(func_name)
-        #logging.basicConfig(filename=log_file_path, level=logging.INFO, filemode='w')
-        #logger = logging.getLogger(func_name)
+        logger.info("this process id should be unique: %s", geoweaver_process_id)
         
         # Capture logging output
-        logger.info(f"Starting {func_name}")
-        print(f"geoweaver captured {func_name}")
+        logger.info(f"geoweaver captured {func_name}")
 
         # Capture console output
         captured_stdout = io.StringIO()
