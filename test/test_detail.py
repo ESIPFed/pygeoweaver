@@ -2,7 +2,7 @@ from io import StringIO
 import sys
 import unittest
 from pygeoweaver.commands.pgw_detail import detail_host, detail_process, detail_workflow
-from pygeoweaver.log_config import get_logger
+from pygeoweaver.pgw_log_config import get_logger
 
 
 logger = get_logger(__name__)

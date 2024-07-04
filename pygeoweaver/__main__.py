@@ -30,7 +30,7 @@ from pygeoweaver.commands.pgw_find import get_process_by_id, get_process_by_lang
 from pygeoweaver.commands.pgw_history import get_process_history, get_workflow_history
 from pygeoweaver.commands.pgw_list import list_processes_in_workflow
 from pygeoweaver.commands.pgw_sync import sync, sync_workflow
-from pygeoweaver.log_config import setup_logging
+from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.server import check_geoweaver_status, show
 from halo import Halo
 from pygeoweaver.utils import get_spinner
