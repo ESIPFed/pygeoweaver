@@ -1,5 +1,6 @@
 import inspect
 import logging
+from logging.config import fileConfig
 import os
 
 
@@ -26,7 +27,7 @@ def setup_logging():
     with open(config_file, 'wt') as f:
         f.write(config_str)
 
-    logging.config.fileConfig(config_file)
+    fileConfig(config_file)
     os.remove(config_file)
 
 
