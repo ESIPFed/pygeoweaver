@@ -14,10 +14,10 @@ def setup_logging():
     current_file = inspect.getfile(inspect.currentframe())
     current_file_path = os.path.abspath(current_file)
     current_folder = os.path.dirname(current_file_path)
-    # Get the absolute path to the logging.ini file
-    logging_ini_path = os.path.abspath(f'{current_folder}/logging.ini')
+    # Get the absolute path to the pgw_logging.ini file
+    logging_ini_path = os.path.abspath(f'{current_folder}/pgw_logging.ini')
 
-    # Open the logging.ini file
+    # Open the pgw_logging.ini file
     with open(logging_ini_path, 'rt') as f:
         config_str = f.read()
         config_str = config_str.replace('%(log_file)s', os.path.expanduser(log_file))
