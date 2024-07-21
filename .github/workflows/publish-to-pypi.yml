@@ -1,6 +1,10 @@
 name: Publish PyGeoweaver Python 🐍 distributions 📦 to PyPI and TestPyPI
 
-on: push
+on:
+  workflow_run:
+    workflows: ["Run Tests"]
+    types:
+      - completed
 
 jobs:
   test-installation:
