@@ -24,6 +24,7 @@ dependencies = [
     "halo",
     "tabulate",
     "psutil",
+    "pytest-xdist",
 ]
 
 [project.urls]

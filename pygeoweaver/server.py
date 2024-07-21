@@ -195,9 +195,8 @@ def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
         # Find all processes running geoweaver.jar
         processes = []
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-            # logger.info(proc)
-            
-            if proc and proc.info and proc.info['cmdline'] and 'geoweaver.jar' in proc.info['cmdline']:
+            if proc and proc.info and proc.info['cmdline'] \
+                and 'geoweaver.jar' in " ".join(proc.info['cmdline']):
                 processes.append(proc)
 
         if not processes:
