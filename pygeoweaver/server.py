@@ -4,6 +4,7 @@ import subprocess
 import sys
 import webbrowser
 import time
+import psutil
 import requests
 from halo import Halo
 
@@ -191,7 +192,32 @@ def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
     with get_spinner(text=f'Stopping Geoweaver...', spinner='dots'):
         # Stop running Geoweaver if any
         logger.info("Stop running Geoweaver if any..")
-        subprocess.run(["pkill", "-f", "geoweaver.jar"])
+        # Find all processes running geoweaver.jar
+        processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            # logger.info(proc)
+            
+            if proc and proc.info and proc.info['cmdline'] and 'geoweaver.jar' in proc.info['cmdline']:
+                processes.append(proc)
+
+        if not processes:
+            print("No running Geoweaver processes found.")
+            return 0
+
+        # Attempt to kill each process
+        errors = []
+        for proc in processes:
+            try:
+                proc.terminate()
+                proc.wait(timeout=5)  # Wait for the process to terminate
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
+                errors.append(f"Failed to kill process {proc.info['pid']}: {e}")
+
+        if errors:
+            for error in errors:
+                logger.error(error)
+            print("Some processes could not be stopped.")
+            return 1
 
         # Check status
         status = subprocess.run(["curl", "-s", "-o", "/dev/null", 

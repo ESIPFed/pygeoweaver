@@ -23,6 +23,7 @@ dependencies = [
     "pandas",
     "halo",
     "tabulate",
+    "psutil",
 ]
 
 [project.urls]

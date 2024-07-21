@@ -33,11 +33,11 @@ class TestServer(unittest.TestCase):
         stop(exit_on_finish=False)  # stop again should have no issue
 
     def test_windows(self):
-        with patch("pygeoweaver.server.checkOS") as mock_checkos:
+        with patch("pygeoweaver.server.check_os") as mock_checkos:
             mock_checkos.return_value = 3
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(FileNotFoundError):
                 start(exit_on_finish=False)
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(FileNotFoundError):
                 stop(exit_on_finish=False)
 
     def test_show_gui(self):
@@ -45,7 +45,7 @@ class TestServer(unittest.TestCase):
             show()
             mock_browser_open.assert_called_once()
 
-            with patch("pygeoweaver.server.checkIPython") as mock_checkipython:
+            with patch("pygeoweaver.server.check_ipython") as mock_checkipython:
                 mock_checkipython.return_value = True
                 show()
                 mock_browser_open.assert_called_once()
