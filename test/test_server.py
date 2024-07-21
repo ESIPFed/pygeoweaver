@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 class TestServer(unittest.TestCase):
     def test_server_start_stop(self):
-        start()
+        start(exit_on_finish=False)
         response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL)
         self.assertEqual(
             response.status_code,
