@@ -32,7 +32,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest -s tests/
+          pytest -s .
 
       - name: Upload pytest results
         if: always()
