@@ -21,18 +21,18 @@ jobs:
         with:
           python-version: '3.9' # specify the Python version you need
 
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH="$HOME/.local/bin:$PATH"
-
       - name: Install dependencies
         run: |
-          poetry install
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Install pytest
+        run: |
+          pip install pytest
 
       - name: Run tests
         run: |
-          poetry run pytest tests/
+          pytest tests/
 
       - name: Upload pytest results
         if: always()
