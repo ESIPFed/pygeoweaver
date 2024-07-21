@@ -35,6 +35,7 @@ jobs:
           fi
 
   build-n-publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     needs: test-installation
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
     runs-on: ubuntu-latest
