@@ -58,6 +58,10 @@ jobs:
         --sdist
         --wheel
         --outdir dist/
+    
+    - name: Check GitHub ref
+      run: echo ${{ github.ref }}
+    
     - name: Publish distribution 📦 to PyPI
       if: startsWith(github.ref, 'refs/tags')
       uses: pypa/gh-action-pypi-publish@release/v1
