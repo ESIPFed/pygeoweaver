@@ -169,7 +169,7 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
         max_counter = 10
         while counter != max_counter:  # max wait for 20 seconds
             try:
-                status = requests.get("http://localhost:8070/Geoweaver").status_code
+                status = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL).status_code
                 logger.debug(f"Received code {status}")
                 if status == 302 or status == 200:
                     break
@@ -221,7 +221,7 @@ def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
         # Check status
         status = subprocess.run(["curl", "-s", "-o", "/dev/null", 
                                 "-w", "%{http_code}\n", 
-                                "http://localhost:8070/Geoweaver"], 
+                                GEOWEAVER_DEFAULT_ENDPOINT_URL], 
                                 capture_output=True, text=True).stdout.strip()
 
         if status != "302":

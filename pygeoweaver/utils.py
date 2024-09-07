@@ -213,3 +213,6 @@ def copy_files(source_folder, destination_folder):
             )
             os.makedirs(os.path.dirname(destination_file), exist_ok=True)
             shutil.copy2(source_file, destination_file)
+
+def get_geoweaver_port():
+    return os.getenv("GEOWEAVER_PORT", "8070")
