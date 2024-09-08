@@ -190,17 +190,21 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
 
 def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
     with get_spinner(text=f'Stopping Geoweaver...', spinner='dots'):
-        # Stop running Geoweaver if any
         logger.info("Stop running Geoweaver if any..")
-        # Find all processes running geoweaver.jar
+
+        # Get current user's UID
+        current_uid = os.getuid()
+
+        # Find all processes running geoweaver.jar that are started by the current user
         processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'uids']):
             if proc and proc.info and proc.info['cmdline'] \
-                and 'geoweaver.jar' in " ".join(proc.info['cmdline']):
+                and 'geoweaver.jar' in " ".join(proc.info['cmdline']) \
+                and proc.info['uids'] and proc.info['uids'].real == current_uid:
                 processes.append(proc)
 
         if not processes:
-            print("No running Geoweaver processes found.")
+            print("No running Geoweaver processes found for the current user.")
             return 0
 
         # Attempt to kill each process
@@ -218,12 +222,12 @@ def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
             print("Some processes could not be stopped.")
             return 1
 
-        # Check status
+        # Check status of Geoweaver
         status = subprocess.run(["curl", "-s", "-o", "/dev/null", 
-                                "-w", "%{http_code}\n", 
-                                GEOWEAVER_DEFAULT_ENDPOINT_URL], 
-                                capture_output=True, text=True).stdout.strip()
-
+                                    "-w", "%{http_code}\n", 
+                                    GEOWEAVER_DEFAULT_ENDPOINT_URL], 
+                                    capture_output=True, text=True).stdout.strip()
+        logger.info("status: "+ status)
         if status != "302":
             print("Stopped.")
             return 0
