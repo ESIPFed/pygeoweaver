@@ -1,9 +1,6 @@
 name: Publish PyGeoweaver Python 🐍 distributions 📦 to PyPI and TestPyPI
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'  # Trigger the workflow for version tags like 'v1.0.0'
   release:
     types: [published]  # Trigger the workflow when a release is published
 
@@ -36,7 +33,6 @@ jobs:
           fi
 
   build-n-publish:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     needs: test-installation
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
     runs-on: ubuntu-latest
