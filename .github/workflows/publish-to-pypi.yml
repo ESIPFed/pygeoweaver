@@ -1,10 +1,6 @@
 name: Publish PyGeoweaver Python 🐍 distributions 📦 to PyPI and TestPyPI
 
 on:
-  workflow_run:
-    workflows: ["Run Tests"]
-    types:
-      - completed
   push:
     tags:
       - 'v*.*.*'  # Trigger the workflow for version tags like 'v1.0.0'
