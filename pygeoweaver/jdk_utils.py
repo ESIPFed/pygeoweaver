@@ -7,7 +7,7 @@ import tarfile
 import zipfile
 import urllib.request
 
-from pygeoweaver.utils import get_home_dir, get_java_bin_path, safe_exit
+from pygeoweaver.utils import detect_rc_file, get_home_dir, get_java_bin_path, safe_exit
 
 
 def install_jdk():
@@ -149,21 +149,22 @@ def set_jdk_env_vars_for_windows(jdk_install_dir):
 def set_jdk_env_vars_for_linux_mac(jdk_install_dir):
     print(f"Setting JDK environment variables...")
     java_line = f'\nexport JAVA_HOME="{jdk_install_dir}"\n'
+    rc_file_path = detect_rc_file()
 
     check_java = False
-    with open(os.path.expanduser("~/.bashrc"), "r") as file:
+    with open(rc_file_path, "r") as file:
         for line in file:
             if line.strip() == java_line:
                 check_java = True
                 break
 
     if not check_java:
-        with open(os.path.expanduser("~/.bashrc"), "a") as bashrc:
+        with open(rc_file_path, "a") as bashrc:
             bashrc.write(f'export JAVA_HOME="{jdk_install_dir}"\n')
             bashrc.write(f'export PATH="$JAVA_HOME/bin:$PATH"\n')
             print("JDK environment variables set.")
 
-    subprocess.run(["bash", "-c", "source ~/.bashrc"])
+    subprocess.run(["bash", "-c", "source", rc_file_path])
 
 
 def set_jdk_env_vars(jdk_install_dir):

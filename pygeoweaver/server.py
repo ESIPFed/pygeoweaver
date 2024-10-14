@@ -15,6 +15,7 @@ from pygeoweaver.utils import (
     check_ipython,
     check_os,
     download_geoweaver_jar,
+    get_log_file_path,
     get_module_absolute_path,
     get_root_dir,
     get_spinner,
@@ -95,11 +96,7 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
             try:
                 response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL, allow_redirects=False)
                 if response.status_code == 302:
-                    log_file = os.path.join(home_dir, "geoweaver.log")
-                    # Ensure the log file exists, create it if it doesn't
-                    if not os.path.exists(log_file):
-                        open(log_file, "a").close()  # Create an empty file if it doesn't exist
-
+                    log_file = get_log_file_path()
                     # Now you can safely open the log file for reading
                     with open(log_file, "r") as f:
                         print(f.read())
@@ -188,20 +185,34 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
                 safe_exit(0)
 
 
-def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
-    with get_spinner(text=f'Stopping Geoweaver...', spinner='dots'):
-        logger.info("Stop running Geoweaver if any..")
+def find_geoweaver_processes(current_uid):
+    """
+    Find all Geoweaver-related processes started by the current user.
+    
+    :param current_uid: The UID of the current user.
+    :return: A list of matching process objects.
+    """
+    processes = []
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'uids']):
+        try:
+            if (proc.info and proc.info['cmdline'] and
+                ('geoweaver.jar' in " ".join(proc.info['cmdline']) or
+                 'GeoweaverApplication' in " ".join(proc.info['cmdline'])) and
+                proc.info['uids'] and proc.info['uids'].real == current_uid):
+                processes.append(proc)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue  # Skip processes that have exited or are inaccessible
+    return processes
+
+def stop_on_mac_linux(exit_on_finish: bool = False) -> int:
+    with get_spinner(text='Stopping Geoweaver...', spinner='dots'):
+        logger.info("Stopping any running Geoweaver processes...")
 
         # Get current user's UID
         current_uid = os.getuid()
 
-        # Find all processes running geoweaver.jar that are started by the current user
-        processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'uids']):
-            if proc and proc.info and proc.info['cmdline'] \
-                and 'geoweaver.jar' in " ".join(proc.info['cmdline']) \
-                and proc.info['uids'] and proc.info['uids'].real == current_uid:
-                processes.append(proc)
+        # Find all processes running geoweaver.jar or GeoweaverApplication that are started by the current user
+        processes = find_geoweaver_processes(current_uid)
 
         if not processes:
             print("No running Geoweaver processes found for the current user.")
@@ -213,9 +224,16 @@ def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
             try:
                 proc.terminate()
                 proc.wait(timeout=5)  # Wait for the process to terminate
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired) as e:
-                errors.append(f"Failed to kill process {proc.info['pid']}: {e}")
+                logger.info(f"Successfully stopped process {proc.info['pid']}.")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                logger.error(f"Process {proc.info['pid']} has already exited or is inaccessible.")
+                errors.append(f"Process {proc.info['pid']} is not accessible.")
+            except psutil.TimeoutExpired:
+                logger.warning(f"Process {proc.info['pid']} did not terminate in time, forcing kill.")
+                proc.kill()  # Forcefully kill if it didn't terminate in time
+                errors.append(f"Process {proc.info['pid']} was forcefully killed.")
 
+        # Log errors if any
         if errors:
             for error in errors:
                 logger.error(error)
@@ -223,16 +241,17 @@ def stop_on_mac_linux(exit_on_finish: bool=False) -> int:
             return 1
 
         # Check status of Geoweaver
-        status = subprocess.run(["curl", "-s", "-o", "/dev/null", 
-                                    "-w", "%{http_code}\n", 
-                                    GEOWEAVER_DEFAULT_ENDPOINT_URL], 
-                                    capture_output=True, text=True).stdout.strip()
-        logger.info("status: "+ status)
+        status = subprocess.run(
+            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}\n", GEOWEAVER_DEFAULT_ENDPOINT_URL],
+            capture_output=True, text=True
+        ).stdout.strip()
+
+        logger.info("Geoweaver status: " + status)
         if status != "302":
-            print("Stopped.")
+            print("Stopped Geoweaver successfully.")
             return 0
         else:
-            print("Error: unable to stop.")
+            print("Error: Unable to stop Geoweaver.")
             return 1
 
 

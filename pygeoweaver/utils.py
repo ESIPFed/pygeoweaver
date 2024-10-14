@@ -69,6 +69,38 @@ def get_root_dir():
     return head
 
 
+def detect_rc_file():
+    """
+    Detect the user's shell and return the appropriate shell configuration (rc) file path.
+    Create the rc file if it doesn't exist.
+    
+    Returns:
+        str: Path to the shell configuration file (e.g., .bashrc, .zshrc, config.fish).
+    """
+    # Detect user's shell
+    user_shell = os.environ.get('SHELL', '/bin/bash')
+    
+    # Determine appropriate shell configuration file based on the detected shell
+    if 'bash' in user_shell:
+        rc_file = os.path.expanduser("~/.bashrc")
+    elif 'zsh' in user_shell:
+        rc_file = os.path.expanduser("~/.zshrc")
+    elif 'fish' in user_shell:
+        rc_file = os.path.expanduser("~/.config/fish/config.fish")
+    else:
+        # Default to bashrc if unknown shell
+        rc_file = os.path.expanduser("~/.bashrc")
+    
+    # Check if the shell configuration file exists, create if it doesn't
+    if not os.path.exists(rc_file):
+        print(f"{rc_file} does not exist. Creating it...")
+        # Ensure the directory exists (for fish, the config directory may not exist)
+        os.makedirs(os.path.dirname(rc_file), exist_ok=True)
+        open(rc_file, 'a').close()
+    
+    return rc_file
+
+
 def get_java_bin_from_which():
     """
     Get the path of the Java binary using the 'which' command.
@@ -78,7 +110,7 @@ def get_java_bin_from_which():
     if system == "Darwin" or system == "Linux":
         try:
             # Source ~/.bashrc (Assuming it's a non-login shell)
-            bashrc_path = os.path.expanduser("~/.bashrc")
+            bashrc_path = detect_rc_file()
             subprocess.run(["bash", "-c", f"source {bashrc_path}"])
 
             # Check the location of Java executable
@@ -216,3 +248,33 @@ def copy_files(source_folder, destination_folder):
 
 def get_geoweaver_port():
     return os.getenv("GEOWEAVER_PORT", "8070")
+
+def get_log_file_path():
+    """
+    Determine the best location to store the geoweaver log file
+    based on the operating system.
+    
+    Returns:
+        str: The full path to the geoweaver log file.
+    """
+    # Get the user's home directory
+    home_dir = os.path.expanduser("~")
+    
+    # Determine the log directory based on the platform
+    if os.name == 'nt':  # Windows
+        log_dir = os.path.join(os.getenv('APPDATA'), 'Geoweaver', 'logs')
+    else:  # macOS/Linux
+        log_dir = os.path.join(home_dir, '.local', 'share', 'geoweaver', 'logs')
+    
+    # Create the directory if it doesn't exist
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Define the full path to the log file
+    log_file = os.path.join(log_dir, "geoweaver.log")
+    
+    # Ensure the log file exists, create it if it doesn't
+    if not os.path.exists(log_file):
+        open(log_file, "a").close()  # Create an empty log file if it doesn't exist
+    
+    return log_file
+
