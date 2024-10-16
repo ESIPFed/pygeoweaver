@@ -188,9 +188,9 @@ def export_command():
     pass
 
 
-@export_command.command()
+@export_command.command("workflow")
 @click.argument('workflow_id', type=str)
-@click.option('--mode', default=4, type=int, help='Exportation mode options: 1 - workflow only, 2 - workflow with process code, 3 - workflow with process code and only good history, 4 - workflow with process code and all the history. Default option is 4.')
+@click.option('--mode', default=4, type=int, help='Exportation mode options: \n1 - workflow only, 2 - workflow with process code, 3 - workflow with process code and only good history, 4 - workflow with process code and all the history. Default option is 4.')
 @click.argument('target_file_path', type=click.Path())
 @click.option('--unzip', is_flag=True, help='Unzip the exported file.')
 @click.option('--unzip-directory-name', help='Specify the directory name when unzipping.')
