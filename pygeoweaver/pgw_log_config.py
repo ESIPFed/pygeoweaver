@@ -21,7 +21,7 @@ def setup_logging():
     # Open the pgw_logging.ini file
     with open(logging_ini_path, 'rt') as f:
         config_str = f.read()
-        config_str = config_str.replace('%(log_file)s', os.path.expanduser(log_file))
+        config_str = config_str.replace('%(log_file)s', os.path.abspath(log_file).replace('\\', '/'))
 
     config_file = f'{current_folder}/logging_temp.ini'
     with open(config_file, 'wt') as f:
