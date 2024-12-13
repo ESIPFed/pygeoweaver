@@ -11,8 +11,8 @@ class GeoweaverProcessAPI(BaseAPI):
     def add_process(self, process_data):
         return self._call_api('/add/process', method='POST', data=process_data)
 
-    def get_process(self, process_id):
-        return self._call_api(f'/get/process/{process_id}', method='GET')
+    def get_process(self, process_data):
+        return self._call_api(f'/detail', method='POST', data=process_data)
 
     def delete_process(self, process_id):
         return self._call_api(f'/delete/process/{process_id}', method='DELETE')
