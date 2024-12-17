@@ -53,4 +53,3 @@ def test_detail_host(capfd):
         or "Unmatched arguments from index 1: 'host', 'not_existing_id'" in clean_out
     )
 
-
