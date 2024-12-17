@@ -1,0 +1,20 @@
+fixed detail command issue
+
+# Conflicts:
+#	test/test_detail.py
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# interactive rebase in progress; onto 4a8e3d2
+# Last command done (1 command done):
+#    pick 408887b fixed detail command issue
+# Next commands to do (2 remaining commands):
+#    pick a06f1c3 fixed and updated detail command issue
+#    pick 4bc8f8f updated detail command issue
+# You are currently rebasing branch 'fix/detail-command' on '4a8e3d2'.
+#
+# Changes to be committed:
+#	modified:   pygeoweaver/commands/pgw_detail.py
+#	modified:   test/test_detail.py
+#
