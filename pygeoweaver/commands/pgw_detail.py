@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def ensure_server_running(force_restart=False, force_download=False):
     """
-    Ensure the Geoweaver server is running. If not, start it.
+    Ensure the Geoweaver server is running. If not, start the sever.
     :param force_restart: Restart the server even if it's already running.
     :param force_download: Force download of Geoweaver jar if necessary.
     """
