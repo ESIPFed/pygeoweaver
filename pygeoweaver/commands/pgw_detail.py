@@ -1,107 +1,124 @@
-"""
-Detail subcommand
-"""
-
 import logging
 import subprocess
-
 import requests
 from pygeoweaver.constants import *
-
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
-    get_java_bin_path,
-    get_root_dir,
     get_spinner,
+    check_os,
+)
+from pygeoweaver.server import (
+    start_on_windows,
+    start_on_mac_linux,
+    check_geoweaver_status,
 )
 
 logger = logging.getLogger(__name__)
+
+def ensure_server_running(force_restart=False, force_download=False):
+    """
+    Ensure the Geoweaver server is running. If not, start it.
+
+    :param force_restart: Restart the server even if it's already running.
+    :param force_download: (Optional) Force download of Geoweaver jar if necessary.
+    """
+    if not force_restart and check_geoweaver_status():
+        logger.info("Geoweaver server is already running.")
+        return
+
+    logger.info("Starting Geoweaver server...")
+
+    # Download jar if forced
+    if force_download:
+        download_geoweaver_jar()
+
+    # Start server based on OS
+    os_type = check_os()
+    if os_type == 3:  # Windows
+        start_on_windows(force_restart=force_restart, exit_on_finish=False)
+    else:  # macOS or Linux
+        start_on_mac_linux(force_restart=force_restart, exit_on_finish=False)
+
+    if not check_geoweaver_status():
+        raise RuntimeError("Failed to start Geoweaver server.")
 
 
 def detail_workflow(workflow_id):
     """
     Display detailed information about a workflow.
-
     :param workflow_id: The ID of the workflow.
-    :type workflow_id: str
     """
     if not workflow_id:
-        raise RuntimeError("Workflow id is missing")
-    with get_spinner(text="Getting host details..", spinner="dots"):
-        download_geoweaver_jar()
+        raise ValueError("Workflow ID is missing.")
+
+    ensure_server_running()
+    with get_spinner(text="Getting workflow details...", spinner="dots"):
         process = subprocess.run(
             [
-                get_java_bin_path(),
-                "-jar",
-                get_geoweaver_jar_path(),
-                "detail",
-                f"--workflow-id={workflow_id}",
+                "java", "-jar", get_geoweaver_jar_path(), "detail",
+                "--workflow-id", workflow_id
             ],
-            cwd=f"{get_root_dir()}/",
+            capture_output=True,
+            text=True
         )
-    
-    print(process.stdout)
-    if process.stderr:
-        print("=== Error ===")
-        print(process.stderr)
-        logger.error(process.stderr)
-        
+        if process.returncode != 0:
+            logger.error(f"Error fetching workflow details: {process.stderr}")
+            print("=== Error ===")
+            print(process.stderr)
+        else:
+            print(process.stdout)
 
 def detail_process(process_id):
     """
     Display detailed information about a process.
-
     :param process_id: The ID of the process.
-    :type process_id: str
     """
     if not process_id:
-        raise RuntimeError("Process id is missing")
-    with get_spinner(text="Getting host details..", spinner="dots"):
-        download_geoweaver_jar()
+        raise ValueError("Process ID is missing.")
+
+    ensure_server_running()
+    with get_spinner(text="Getting process details...", spinner="dots"):
         process = subprocess.run(
             [
-                get_java_bin_path(),
-                "-jar",
-                get_geoweaver_jar_path(),
-                "detail",
-                f"--process-id={process_id}",
+                "java", "-jar", get_geoweaver_jar_path(), "detail",
+                "--process-id", process_id
             ],
-            cwd=f"{get_root_dir()}/",
+            capture_output=True,
+            text=True
         )
-    print(process.stdout)
-    if process.stderr:
-        print("=== Error ===")
-        print(process.stderr)
-        logger.error(process.stderr)
+        if process.returncode != 0:
+            logger.error(f"Error fetching process details: {process.stderr}")
+            print("=== Error ===")
+            print(process.stderr)
+        else:
+            print(process.stdout)
 
 def detail_host(host_id):
     """
     Display detailed information about a host.
-
     :param host_id: The ID of the host.
-    :type host_id: str
     """
     if not host_id:
-        raise RuntimeError("Host id is missing")
-    with get_spinner(text="Getting host details..", spinner="dots"):
-        download_geoweaver_jar()
+        raise ValueError("Host ID is missing.")
+
+    ensure_server_running()
+    with get_spinner(text="Getting host details...", spinner="dots"):
         process = subprocess.run(
             [
-                get_java_bin_path(),
-                "-jar",
-                get_geoweaver_jar_path(),
-                "detail",
-                f"--host-id={host_id}",
+                "java", "-jar", get_geoweaver_jar_path(), "detail",
+                "--host-id", host_id
             ],
-            cwd=f"{get_root_dir()}/",
+            capture_output=True,
+            text=True
         )
-    
-    print(process.stdout)
-    if process.stderr:
-        print("=== Error ===")
-        print(process.stderr)
-        logger.error(process.stderr)
+        if process.returncode != 0:
+            logger.error(f"Error fetching host details: {process.stderr}")
+            print("=== Error ===")
+            print(process.stderr)
+        else:
+            print(process.stdout)
+
 
 def get_process_code(process_id):
     """
