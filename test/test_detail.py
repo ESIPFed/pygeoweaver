@@ -54,5 +54,3 @@ def test_detail_host(capfd):
     )
 
 
-
-
