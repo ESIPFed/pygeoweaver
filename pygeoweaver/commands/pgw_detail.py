@@ -7,6 +7,8 @@ from pygeoweaver.server import ensure_geoweaver_started
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
+    get_java_bin_path,
+    get_root_dir,
     get_spinner,
     check_os,
 )
