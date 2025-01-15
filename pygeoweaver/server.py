@@ -289,3 +289,9 @@ def show(geoweaver_url=GEOWEAVER_DEFAULT_ENDPOINT_URL):
     else:
         logger.info("enter self opening block")
         webbrowser.open(geoweaver_url)
+
+
+def ensure_geoweaver_started():
+    geoweaver_running = check_geoweaver_status()
+    if not geoweaver_running:
+        start(exit_on_finish=False)

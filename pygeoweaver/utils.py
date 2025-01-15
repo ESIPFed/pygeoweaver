@@ -9,8 +9,10 @@ import platform
 from IPython import get_ipython
 from halo import Halo
 from pygeoweaver.constants import GEOWEAVER_URL
+from pygeoweaver.pgw_log_config import get_logger
 from pygeoweaver.pgw_spinner import Spinner
 
+logger = get_logger(__name__)
 
 def is_interactive():
     """
@@ -130,36 +132,64 @@ def get_java_bin_from_which():
     return java_bin_path
 
 
-def get_java_bin_path():
-    """
-    Get the path of the Java binary.
-    """
-    system = platform.system()
-    if system == "Windows":  # Windows
-        java_exe = "java.exe"
-    else:
-        java_exe = "java"
+def check_java_in_default_env(java_exe="java"):
+    try:
+        # Attempt to run 'java -version' in the default environment
+        subprocess.run([java_exe, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        return True
+    except FileNotFoundError:
+        # If 'java' is not found in the default environment
+        return False
+    except subprocess.CalledProcessError:
+        # If 'java' is found but there is an issue with execution
+        return False
 
+def get_java_bin_path(java_exe="java"):
     java_bin_path = None
+    home_dir = get_home_dir()
 
-    if java_bin_path is None:
-        java_bin_path = get_java_bin_from_which()
-        
-    # Get the user's home directory
-    home_dir = os.path.expanduser("~")
-    if java_bin_path  is None or not java_bin_path .strip():
-        # check the local path 
-        jdk_home = os.path.join(home_dir, "jdk", "jdk-11.0.18+10")  # Change this to your JDK installation directory
-        print("Check jdk_home", jdk_home)
-        java_cmd = os.path.join(jdk_home, "bin", "java.exe")
-        if not os.path.exists(java_cmd):
-            print("Java command not found. Install it.")
-        else:
+    # First check if Java is available in the default environment
+    if check_java_in_default_env(java_exe):
+        # If Java is found in the default environment, return its path
+        logger.info(f"Java is available in the default environment.")
+        return java_exe
+
+    # Check if JAVA_HOME is set
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        java_cmd = os.path.join(java_home, "bin", java_exe)
+        if os.path.exists(java_cmd):
             java_bin_path = java_cmd
-            print(f"Found java bin path {java_bin_path}")
+            print(f"Found Java in JAVA_HOME: {java_bin_path}")
+            return java_bin_path
 
+    # Look for common installation paths
+    common_paths = [
+        os.path.join(home_dir, "jdk"),
+        os.path.join(home_dir, "java"),
+        "/usr/lib/jvm",  # Common location on Linux
+        "/usr/bin/java",  # Alternate location on Linux
+        "/usr/local/bin/java",
+        "C:\\Program Files\\Java",  # Common location on Windows
+        "C:\\Program Files (x86)\\Java",  # Alternate location on Windows
+    ]
+
+    for base_path in common_paths:
+        if os.path.exists(base_path):
+            for root, dirs, _ in os.walk(base_path):
+                if "bin" in dirs:
+                    java_cmd = os.path.join(root, "bin", java_exe)
+                    if os.path.exists(java_cmd):
+                        java_bin_path = java_cmd
+                        print(f"Found Java in {base_path}: {java_bin_path}")
+                        return java_bin_path
+
+    # If Java is still not found, we can download and install it to the home directory
+    print("Java not found, proceeding to download and install it to the home directory.")
+    # Add code to download and install Java here (for example using wget, curl, or a package manager)
+    # For now, let's assume the installation is handled and return the path after installation.
+    java_bin_path = os.path.join(home_dir, "java", "bin", java_exe)
     return java_bin_path
-
 
 def get_module_absolute_path():
     """

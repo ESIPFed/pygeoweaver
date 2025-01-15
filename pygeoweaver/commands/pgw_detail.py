@@ -8,6 +8,7 @@ import subprocess
 import requests
 from pygeoweaver.constants import *
 
+from pygeoweaver.server import ensure_geoweaver_started
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,
@@ -28,8 +29,9 @@ def detail_workflow(workflow_id):
     """
     if not workflow_id:
         raise RuntimeError("Workflow id is missing")
-    with get_spinner(text="Getting host details..", spinner="dots"):
+    with get_spinner(text="Getting workflow details..", spinner="dots"):
         download_geoweaver_jar()
+        ensure_geoweaver_started()
         process = subprocess.run(
             [
                 get_java_bin_path(),
@@ -41,7 +43,7 @@ def detail_workflow(workflow_id):
             cwd=f"{get_root_dir()}/",
         )
     
-    print(process.stdout)
+    print("\n", process.stdout)
     if process.stderr:
         print("=== Error ===")
         print(process.stderr)
@@ -57,8 +59,9 @@ def detail_process(process_id):
     """
     if not process_id:
         raise RuntimeError("Process id is missing")
-    with get_spinner(text="Getting host details..", spinner="dots"):
+    with get_spinner(text="Getting process details..", spinner="dots"):
         download_geoweaver_jar()
+        ensure_geoweaver_started()
         process = subprocess.run(
             [
                 get_java_bin_path(),
@@ -69,7 +72,7 @@ def detail_process(process_id):
             ],
             cwd=f"{get_root_dir()}/",
         )
-    print(process.stdout)
+    print("\n", process.stdout)
     if process.stderr:
         print("=== Error ===")
         print(process.stderr)
@@ -84,8 +87,9 @@ def detail_host(host_id):
     """
     if not host_id:
         raise RuntimeError("Host id is missing")
-    with get_spinner(text="Getting host details..", spinner="dots"):
+    with get_spinner(text="Getting host details..\n", spinner="dots"):
         download_geoweaver_jar()
+        ensure_geoweaver_started()
         process = subprocess.run(
             [
                 get_java_bin_path(),
@@ -97,11 +101,11 @@ def detail_host(host_id):
             cwd=f"{get_root_dir()}/",
         )
     
-    print(process.stdout)
-    if process.stderr:
-        print("=== Error ===")
-        print(process.stderr)
-        logger.error(process.stderr)
+        print("\n" + process.stdout)
+        if process.stderr:
+            print("=== Error ===")
+            print(process.stderr)
+            logger.error(process.stderr)
 
 def get_process_code(process_id):
     """
@@ -112,6 +116,7 @@ def get_process_code(process_id):
     :return: The code of the process.
     :rtype: str
     """
+    ensure_geoweaver_started()
     r = requests.post(
         f"{GEOWEAVER_DEFAULT_ENDPOINT_URL}/web/detail",
         data={"type": "process", "id": process_id},
