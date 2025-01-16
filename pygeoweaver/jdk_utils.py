@@ -7,6 +7,8 @@ import tarfile
 import zipfile
 import urllib.request
 
+import click
+
 from pygeoweaver.utils import detect_rc_file, get_home_dir, get_java_bin_path, safe_exit
 
 
@@ -164,7 +166,7 @@ def set_jdk_env_vars_for_linux_mac(jdk_install_dir):
             bashrc.write(f'export PATH="$JAVA_HOME/bin:$PATH"\n')
             print("JDK environment variables set.")
 
-    subprocess.run(["bash", "-c", "source", rc_file_path])
+    subprocess.run(["bash", "-i", "-c", f"source {rc_file_path} && echo 'Java environment sourced.'"])
 
 
 def set_jdk_env_vars(jdk_install_dir):
@@ -228,6 +230,18 @@ def is_java_installed():
 def check_java():
     # Check if Java is installed
     if not is_java_installed():
-        print("Java is not installed. Installing...")
-        install_jdk()
-        print("Java installation complete.")
+        click.echo(click.style("Java is not installed. Installing...", fg="yellow"))
+        try:
+            install_jdk()
+            if is_java_installed():
+                click.echo(click.style("Java installation complete.", fg="green"))
+            else:
+                click.echo(click.style("Java is still not installed correctly. Please follow the instructions below.", fg="red"))
+                click.echo(click.style("Step 1: Visit https://adoptium.net/ to download and install OpenJDK (Eclipse Adoptium).", fg="blue"))
+                click.echo(click.style("Step 2: Choose the appropriate JDK version for your operating system.", fg="blue"))
+                click.echo(click.style("Step 3: Follow the installation instructions provided on the website.", fg="blue"))
+                click.echo(click.style("Step 4: After installation, make sure JAVA_HOME and PATH are set correctly.", fg="blue"))
+                click.echo(click.style("If you encounter any problems, please contact support at geoweaver.app@gmail.com or post in GitHub issues: https://github.com/ESIPFed/pygeoweaver/issues.", fg="red"))
+        except Exception as e:
+            click.echo(click.style(f"Error: {e}", fg="red"))
+            click.echo(click.style("Please contact support at support@example.com for further assistance.", fg="red"))
