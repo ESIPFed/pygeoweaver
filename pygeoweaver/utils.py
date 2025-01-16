@@ -135,10 +135,9 @@ def get_java_bin_path():
     Get the path of the Java binary.
     """
     system = platform.system()
+    java_exe = "java"
     if system == "Windows":  # Windows
         java_exe = "java.exe"
-    else:
-        java_exe = "java"
 
     java_bin_path = None
 
@@ -147,13 +146,13 @@ def get_java_bin_path():
         
     # Get the user's home directory
     home_dir = os.path.expanduser("~")
-    if java_bin_path  is None or not java_bin_path .strip():
+    if java_bin_path is None or not java_bin_path.strip():
         # check the local path 
         jdk_home = os.path.join(home_dir, "jdk", "jdk-11.0.18+10")  # Change this to your JDK installation directory
         print("Check jdk_home", jdk_home)
-        java_cmd = os.path.join(jdk_home, "bin", "java.exe")
+        java_cmd = os.path.join(jdk_home, "bin", java_exe)
         if not os.path.exists(java_cmd):
-            print("Java command not found. Install it.")
+            print("Java command ", java_cmd," not found. Install it.")
         else:
             java_bin_path = java_cmd
             print(f"Found java bin path {java_bin_path}")
