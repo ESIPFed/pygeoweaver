@@ -28,7 +28,7 @@ from pygeoweaver.commands.pgw_create import create_process, create_process_from_
 from pygeoweaver.commands.pgw_detail import get_process_code
 from pygeoweaver.commands.pgw_find import get_process_by_id, get_process_by_language, get_process_by_name
 from pygeoweaver.commands.pgw_history import get_process_history, get_workflow_history
-from pygeoweaver.commands.pgw_list import list_processes_in_workflow
+from pygeoweaver.commands.pgw_list import list_processes_in_workflow, list_hosts, list_processes, list_workflows
 from pygeoweaver.commands.pgw_sync import sync, sync_workflow
 from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.server import check_geoweaver_status, show
@@ -229,7 +229,7 @@ def get_process_by_name_command(process_name):
     :param process_name: The name of the process.
     :type process_name: str
     """
-    return get_process_by_name(process_name)
+    print(get_process_by_name(process_name).to_markdown())
 
 
 @find_command.command("id")
@@ -241,7 +241,7 @@ def get_process_by_id_command(process_id):
     :param process_id: The ID of the process.
     :type process_id: str
     """
-    return get_process_by_id(process_id)
+    print(get_process_by_id(process_id).to_markdown())
     
     
 @find_command.command("language")
@@ -253,7 +253,7 @@ def get_process_by_language_command(language):
     :param language: The programming language of the processes.
     :type language: str
     """
-    return get_process_by_language(language)
+    print(get_process_by_language(language).to_markdown())
 
 @geoweaver.group("history")
 def history_command():

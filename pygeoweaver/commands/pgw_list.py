@@ -52,7 +52,13 @@ def list_processes():
     """
     with get_spinner(text=f'Find all registered processes...', spinner='dots'):
         download_geoweaver_jar()
-        subprocess.run(["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/")
+        # chmod subprocess not supported in Windows, used alternative approach - supports all OS
+        jar_path = get_geoweaver_jar_path()
+        try:
+            os.chmod(jar_path, 0o755)
+        except Exception as e:
+            # On Windows this might not have any effect, but it won't cause the script to fail.
+            print(f"Warning: Unable to set executable permissions on {jar_path}: {e}")
         process = subprocess.run(
             [get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "list", "--process"],
             cwd=f"{get_root_dir()}/",
