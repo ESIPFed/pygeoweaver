@@ -22,6 +22,7 @@ from pygeoweaver import (
     run_process,
     run_workflow,
     helpwith,
+    clean_h2db,
 )
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.commands.pgw_create import create_process, create_process_from_file, create_workflow
@@ -30,6 +31,7 @@ from pygeoweaver.commands.pgw_find import get_process_by_id, get_process_by_lang
 from pygeoweaver.commands.pgw_history import get_process_history, get_workflow_history
 from pygeoweaver.commands.pgw_list import list_processes_in_workflow
 from pygeoweaver.commands.pgw_sync import sync, sync_workflow
+from pygeoweaver.commands.pgw_upgrade import upgrade_geoweaver
 from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.server import check_geoweaver_status, show
 from halo import Halo
@@ -500,7 +502,59 @@ def status():
         click.echo(click.style("Geoweaver is running", fg='green', bold=True))
     else:
         click.echo(click.style("Geoweaver is not running", fg='red', bold=True))
+
+
+@geoweaver.command("cleanh2db")
+@click.option('--h2-jar-path', type=click.Path(exists=True), help='Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.')
+@click.option('--temp-dir', type=click.Path(), help='Path to a temporary directory for the recovery process. If not provided, will create one.')
+@click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, will use ~/h2_hopper_amd_1/gw.')
+@click.option('--username', default="geoweaver", help='Username for the H2 database. Defaults to "geoweaver".')
+@click.option('--password', help='Password for the H2 database. If not provided, will prompt the user.')
+def cleanh2db_command(h2_jar_path, temp_dir, db_path, username, password):
+    """
+    Clean and reduce the size of the H2 database used by Geoweaver.
     
+    This command follows these steps:
+    1. Stop Geoweaver if it's running
+    2. Create a temporary directory if one is not provided
+    3. Copy database files to the temporary directory
+    4. Export data from the database to a SQL file
+    5. Remove the original database files
+    6. Import the SQL file into a new database
+    7. Start Geoweaver
+    """
+    success = clean_h2db(
+        h2_jar_path=h2_jar_path,
+        temp_dir=temp_dir,
+        db_path=db_path,
+        username=username,
+        password=password
+    )
+    
+    if success:
+        click.echo(click.style("H2 database cleanup completed successfully!", fg='green', bold=True))
+    else:
+        click.echo(click.style("H2 database cleanup failed. Check the logs for details.", fg='red', bold=True))
+
+
+@geoweaver.command("upgrade")
+@click.option('--force', is_flag=True, help='Skip confirmation prompt and force upgrade')
+@click.option('--no-start', is_flag=True, help='Do not start Geoweaver after upgrade')
+def upgrade_command(force, no_start):
+    """
+    Upgrade Geoweaver by downloading the latest JAR file.
+    
+    This command follows these steps:
+    1. Stop Geoweaver if it's running
+    2. Force download the latest Geoweaver JAR file
+    3. Start Geoweaver (unless --no-start is specified)
+    """
+    success = upgrade_geoweaver(force=force, no_start=no_start)
+    
+    if success:
+        click.echo(click.style("Geoweaver upgrade completed successfully!", fg='green', bold=True))
+    else:
+        click.echo(click.style("Geoweaver upgrade failed. Check the logs for details.", fg='red', bold=True))
 
 
 if __name__ == "__main__":
