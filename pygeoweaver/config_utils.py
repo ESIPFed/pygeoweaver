@@ -47,6 +47,11 @@ def get_database_url_from_properties():
     home_dir = os.path.expanduser("~")
     properties_path = os.path.join(home_dir, "geoweaver", "application.properties")
     
+    if not os.path.exists(properties_path):
+        logger.info(f"Application properties file not found at {properties_path}")
+        return None
+    
+    logger.info(f"Reading database configuration from {properties_path}")
     properties = read_properties_file(properties_path)
     
     # Look for database URL configuration
@@ -65,4 +70,5 @@ def get_database_url_from_properties():
             logger.info(f"Found database URL in properties file: {url}")
             return url
     
+    logger.info("No database URL configuration found in properties file")
     return None

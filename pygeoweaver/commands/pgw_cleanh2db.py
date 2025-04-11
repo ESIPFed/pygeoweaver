@@ -64,10 +64,13 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
                 logger.info(f"Using database path from application.properties: {db_path}")
             else:
                 logger.warning(f"Could not parse database path from URL: {custom_db_url}")
-                db_path = os.path.join(home_dir, "h2_hopper_amd_1", "gw")
+                # Use default path with 'h2' instead of 'h2_hopper_amd_1'
+                db_path = os.path.join(home_dir, "h2", "gw")
         else:
-            # Use default path
-            db_path = os.path.join(home_dir, "h2_hopper_amd_1", "gw")
+            # Use default path with 'h2' instead of 'h2_hopper_amd_1'
+            db_path = os.path.join(home_dir, "h2", "gw")
+        
+        logger.info(f"Using database path: {db_path}")
     
     # Set default H2 JAR path and version
     h2_version = "2.2.224"
@@ -113,21 +116,37 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
     # Step 2: Copy database files to the temporary directory
     with get_spinner(text="Copying database files to temporary directory...", spinner="dots"):
         db_dir = os.path.dirname(db_path)
-        for file in os.listdir(db_dir):
-            if file.startswith(os.path.basename(db_path)):
-                src_file = os.path.join(db_dir, file)
-                dst_file = os.path.join(temp_dir, file)
-                shutil.copy2(src_file, dst_file)
-                logger.info(f"Copied {src_file} to {dst_file}")
+        
+        # Check if the directory exists before trying to list its contents
+        if not os.path.exists(db_dir):
+            logger.warning(f"Database directory does not exist: {db_dir}")
+            logger.info(f"Creating directory: {db_dir}")
+            os.makedirs(db_dir, exist_ok=True)
+            # Since the directory didn't exist, there are no files to copy
+            logger.info(f"No database files to copy from {db_dir}")
+        else:
+            # Directory exists, copy any matching files
+            files_copied = False
+            for file in os.listdir(db_dir):
+                if file.startswith(os.path.basename(db_path)):
+                    src_file = os.path.join(db_dir, file)
+                    dst_file = os.path.join(temp_dir, file)
+                    shutil.copy2(src_file, dst_file)
+                    logger.info(f"Copied {src_file} to {dst_file}")
+                    files_copied = True
+            
+            if not files_copied:
+                logger.info(f"No database files found in {db_dir} matching pattern {os.path.basename(db_path)}*")
     
     # Step 3: Export data from the database to a SQL file
     sql_file = os.path.join(temp_dir, "gw_backup.sql")
-    with get_spinner(text="Exporting database to SQL file...", spinner="dots"):
-        # Prompt for password if not provided
-        if not password:
-            import getpass
-            password = getpass.getpass("Enter database password: ")
+    
+    # Prompt for password if not provided - moved outside of spinner context
+    if not password:
+        import getpass
+        password = getpass.getpass("Enter database password: ")
         
+    with get_spinner(text="Exporting database to SQL file...", spinner="dots"):
         # Build the command to export the database
         export_cmd = [
             "java", "-cp", h2_jar_path, 
@@ -147,13 +166,31 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
     
     # Step 4: Remove the original database files
     with get_spinner(text="Removing original database files...", spinner="dots"):
-        for file in os.listdir(db_dir):
-            if file.startswith(os.path.basename(db_path)):
-                os.remove(os.path.join(db_dir, file))
-                logger.info(f"Removed {os.path.join(db_dir, file)}")
+        # Check if the directory exists before trying to remove files
+        if not os.path.exists(db_dir):
+            logger.warning(f"Database directory does not exist: {db_dir}")
+            # Create the directory for the import step
+            os.makedirs(db_dir, exist_ok=True)
+        else:
+            # Directory exists, remove any matching files
+            files_removed = False
+            for file in os.listdir(db_dir):
+                if file.startswith(os.path.basename(db_path)):
+                    os.remove(os.path.join(db_dir, file))
+                    logger.info(f"Removed {os.path.join(db_dir, file)}")
+                    files_removed = True
+            
+            if not files_removed:
+                logger.info(f"No database files found to remove in {db_dir}")
     
     # Step 5: Import the SQL file into a new database
     with get_spinner(text="Importing SQL file into new database...", spinner="dots"):
+        # Ensure the target directory exists
+        db_dir = os.path.dirname(db_path)
+        if not os.path.exists(db_dir):
+            logger.info(f"Creating database directory: {db_dir}")
+            os.makedirs(db_dir, exist_ok=True)
+            
         # Build the command to import the database
         import_cmd = [
             "java", "-cp", h2_jar_path, 
