@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import re
 import urllib.request
+import platform
+import tempfile
 from pathlib import Path
 
 from pygeoweaver.server import stop, start, check_geoweaver_status
@@ -108,10 +110,56 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
     
     # Create a temporary directory if not provided
     if not temp_dir:
-        temp_dir = os.path.join(home_dir, "geoweaver", "h2")
+        # Try to use system temp directory first as it usually has more space
+        system_temp = tempfile.gettempdir()
+        username = os.environ.get('USER', os.environ.get('USERNAME', 'user'))
+        
+        # Check if we're on a cluster system that might have a scratch directory
+        potential_dirs = [
+            # Standard system temp directory
+            system_temp,
+            # User-specific scratch directory on clusters
+            f"/scratch/{username}",
+            # Alternative scratch locations
+            f"/tmp/{username}",
+            # Fallback to home directory
+            os.path.join(home_dir, "geoweaver", "h2")
+        ]
+        
+        # Find the first directory that exists and has sufficient space
+        for potential_dir in potential_dirs:
+            if os.path.exists(os.path.dirname(potential_dir)):
+                try:
+                    # Check available disk space (in bytes)
+                    if platform.system() == "Windows":
+                        free_bytes = shutil.disk_usage(os.path.dirname(potential_dir)).free
+                    else:
+                        # Unix systems
+                        stat = os.statvfs(os.path.dirname(potential_dir))
+                        free_bytes = stat.f_frsize * stat.f_bavail
+                    
+                    # Require at least 1GB of free space (adjust as needed)
+                    required_space = 1 * 1024 * 1024 * 1024  # 1GB in bytes
+                    
+                    if free_bytes > required_space:
+                        temp_dir = os.path.join(potential_dir, "geoweaver_h2_temp")
+                        logger.info(f"Using temporary directory with {free_bytes / (1024**3):.2f}GB free space: {temp_dir}")
+                        break
+                    else:
+                        logger.warning(f"Insufficient disk space in {potential_dir}: {free_bytes / (1024**3):.2f}GB free")
+                except Exception as e:
+                    logger.warning(f"Error checking disk space in {potential_dir}: {str(e)}")
+                    continue
+        
+        # If no suitable directory was found, use system temp as last resort
+        if not temp_dir:
+            temp_dir = os.path.join(system_temp, f"geoweaver_h2_temp_{username}")
+            logger.warning(f"No directory with sufficient space found, using system temp as last resort: {temp_dir}")
     
     # Ensure the temporary directory exists
     os.makedirs(temp_dir, exist_ok=True)
+    
+    logger.info(f"Using temporary directory: {temp_dir}")
     
     # Step 2: Copy database files to the temporary directory
     with get_spinner(text="Copying database files to temporary directory...", spinner="dots"):
