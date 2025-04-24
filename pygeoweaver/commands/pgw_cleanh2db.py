@@ -14,6 +14,7 @@ from pygeoweaver.server import stop, start, check_geoweaver_status
 from pygeoweaver.utils import get_spinner, safe_exit, get_home_dir
 from pygeoweaver.jdk_utils import check_java, download_file
 from pygeoweaver.config_utils import get_database_url_from_properties
+from pygeoweaver.config import H2_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
     Args:
         h2_jar_path (str, optional): Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.
         temp_dir (str, optional): Path to a temporary directory for the recovery process. If not provided, will create one.
-        db_path (str, optional): Path to the H2 database files. If not provided, will use ~/h2_hopper_amd_1/gw.
+        db_path (str, optional): Path to the H2 database files. If not provided, will use ~/h2/gw.
         username (str, optional): Username for the H2 database. Defaults to "geoweaver".
         password (str, optional): Password for the H2 database. If not provided, will prompt the user.
     
@@ -75,7 +76,7 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
         logger.info(f"Using database path: {db_path}")
     
     # Set default H2 JAR path and version
-    h2_version = "2.2.224"
+    h2_version = H2_VERSION
     if not h2_jar_path:
         # First check in current directory
         h2_jar_path = f"h2-{h2_version}.jar"

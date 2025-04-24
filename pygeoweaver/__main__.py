@@ -516,7 +516,7 @@ def status():
 @geoweaver.command("cleanh2db")
 @click.option('--h2-jar-path', type=click.Path(exists=True), help='Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.')
 @click.option('--temp-dir', type=click.Path(), help='Path to a temporary directory for the recovery process. If not provided, will create one.')
-@click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, will use ~/h2_hopper_amd_1/gw.')
+@click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, will use ~/h2/gw.')
 @click.option('--username', default="geoweaver", help='Username for the H2 database. Defaults to "geoweaver".')
 @click.option('--password', help='Password for the H2 database. If not provided, will prompt the user.')
 def cleanh2db_command(h2_jar_path, temp_dir, db_path, username, password):

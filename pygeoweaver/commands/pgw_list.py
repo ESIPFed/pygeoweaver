@@ -4,6 +4,7 @@ import logging
 import requests
 import subprocess
 from pygeoweaver.constants import *
+from pygeoweaver.config import H2_DOWNLOAD_URL, ORG_H2_TOOLS_RUNSCRIPT, JAVA, ORG_H2_TOOLS_SCRIPT, GEOWEAVER_H2_TEMP, GW_BACKUP_SQL, GW_WORKSPACE
 from pygeoweaver.utils import (
     download_geoweaver_jar,
     get_geoweaver_jar_path,

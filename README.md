@@ -134,7 +134,7 @@ Thank you for choosing PyGeoWeaver! We hope this package enhances your geospatia
 - **Options**:
   - `--h2-jar-path PATH`: Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.
   - `--temp-dir PATH`: Path to a temporary directory for the recovery process. If not provided, will create one.
-  - `--db-path PATH`: Path to the H2 database files. If not provided, will use ~/h2_hopper_amd_1/gw.
+  - `--db-path PATH`: Path to the H2 database files. If not provided, will use ~/h2/gw.
   - `--username TEXT`: Username for the H2 database. Defaults to "geoweaver".
   - `--password TEXT`: Password for the H2 database. If not provided, will prompt the user.
   - `--help`: Show this message and exit.
