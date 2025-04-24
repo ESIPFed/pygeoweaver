@@ -117,123 +117,161 @@ Thank you for choosing PyGeoWeaver! We hope this package enhances your geospatia
 
 ## Subcommands Documentation
 
-### resetpassword
-
-- **Usage**: `resetpassword`
-- **Description**: Resets the password for localhost.
-- **Options**:
-  - `-p <password>`: Specify the password to reset.
-- **Expected Behavior**: Prompts for password input twice to ensure accuracy.
-- **Output**: Confirmation of password reset.
-
 ### cleanh2db
 
-- **Usage**: `cleanh2db`
-- **Description**: Cleans the H2 database.
-- **Options**: None
-- **Expected Behavior**: Removes unnecessary data from the H2 database.
-- **Output**: Confirmation of database cleanup.
+- **Usage**: `gw cleanh2db [OPTIONS]`
+- **Description**: Clean and reduce the size of the H2 database used by Geoweaver.
+  
+  This command follows these steps:
+  1. Stop Geoweaver if it's running
+  2. Create a temporary directory if one is not provided
+  3. Copy database files to the temporary directory
+  4. Export data from the database to a SQL file
+  5. Remove the original database files
+  6. Import the SQL file into a new database
+  7. Start Geoweaver
+
+- **Options**:
+  - `--h2-jar-path PATH`: Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.
+  - `--temp-dir PATH`: Path to a temporary directory for the recovery process. If not provided, will create one.
+  - `--db-path PATH`: Path to the H2 database files. If not provided, will use ~/h2_hopper_amd_1/gw.
+  - `--username TEXT`: Username for the H2 database. Defaults to "geoweaver".
+  - `--password TEXT`: Password for the H2 database. If not provided, will prompt the user.
+  - `--help`: Show this message and exit.
 
 ### create
 
-- **Usage**: `create`
-- **Description**: Creates a new object.
-- **Options**:
-  - `-t <type>`: Specify the type of object to create.
-- **Expected Behavior**: Creates the specified object type.
-- **Output**: Confirmation of object creation.
+- **Usage**: `gw create [OPTIONS] COMMAND [ARGS]...`
+- **Description**: Create commands for Geoweaver.
+- **Commands**:
+  - `process`: Create a process with given code or file path
+    - **Options**:
+      - `--lang`: Programming language of the process
+      - `--description`: Description of the process
+      - `--name`: Name of the process
+      - `--code`: Process code
+      - `--file-path`: Path to file containing the code
+      - `--owner`: Owner ID (default: "111111")
+      - `--confidential`: Privacy flag (default: false)
+  - `workflow`: Create a workflow with given configuration
+    - **Options**:
+      - `--description`: Workflow description
+      - `--edges`: Workflow edges configuration
+      - `--name`: Workflow name
+      - `--nodes`: Workflow nodes configuration
+      - `--owner`: Owner ID (default: "111111")
+      - `--confidential`: Privacy flag (default: false)
+- **Examples**:
+  ```shell
+  # Create a process
+  gw create process --lang python --name "my_process" --description "My process" --code "print('Hello')" 
+  
+  # Create a process from file
+  gw create process --lang python --name "file_process" --description "Process from file" --file-path "script.py"
+  
+  # Create a workflow
+  gw create workflow --name "my_workflow" --description "My workflow" --nodes "[...]" --edges "[...]"
+  ```
 
 ### detail
 
-- **Usage**: `detail`
-- **Description**: Provides detailed information about an object.
+- **Usage**: `gw detail [OPTIONS] COMMAND [ARGS]...`
+- **Description**: Display detailed information about Geoweaver objects.
+- **Commands**:
+  - `code`: Get the code of a process.
+  - `host`: Display detailed information about a host.
+  - `process`: Display detailed information about a process.
+  - `workflow`: Display detailed information about a workflow.
 - **Options**:
-  - `-i <id>`: Specify the ID of the object.
-- **Expected Behavior**: Displays detailed information about the specified object.
-- **Output**: Detailed object information.
+  - `--help`: Show help message and exit.
+- **Examples**:
+  ```shell
+  gw detail process <process_id>
+  gw detail workflow <workflow_id>
+  gw detail host <host_id>
+  gw detail code <process_id>
+  ```
 
 ### export
 
-- **Usage**: `export`
-- **Description**: Exports data to a specified format.
+- **Usage**: `gw export workflow [OPTIONS] WORKFLOW_ID TARGET_FILE_PATH`
+- **Description**: Exports a workflow to a specified file.
+- **Arguments**:
+  - `workflow_id`: Geoweaver workflow ID
+  - `target_file_path`: Target file path to save the workflow zip
 - **Options**:
-  - `-f <format>`: Specify the export format.
-- **Expected Behavior**: Exports data in the specified format.
-- **Output**: Confirmation of data export.
+  - `--mode INTEGER`: Export mode (default: 4)
+    - 1: Workflow only
+    - 2: Workflow with process code
+    - 3: Workflow with process code and only good history
+    - 4: Workflow with process code and all history
+  - `--unzip`: Unzip the exported file
+  - `--unzip-directory-name TEXT`: Specify the directory name when unzipping
+- **Example**:
+  ```shell
+  # Export workflow with all history
+  gw export workflow my_workflow_id ./my_workflow.zip
+  
+  # Export workflow and unzip to specific directory
+  gw export workflow --unzip --unzip-directory-name my_workflow my_workflow_id ./my_workflow.zip
+  ```
 
 ### find
 
-- **Usage**: `find`
-- **Description**: Finds objects based on criteria.
-- **Options**:
-  - `-c <criteria>`: Specify the search criteria.
-- **Expected Behavior**: Searches for objects matching the criteria.
-- **Output**: List of matching objects.
+- **Usage**: `gw find [OPTIONS] COMMAND [ARGS]...`
+- **Description**: Find commands for Geoweaver.
+- **Commands**:
+  - `id`: Get a process by its ID
+    ```shell
+    gw find id <process_id>
+    ```
+  - `language`: Get processes by their programming language
+    ```shell
+    gw find language <programming_language>
+    ```
+  - `name`: Get processes by their name
+    ```shell
+    gw find name <process_name>
+    ```
 
 ### help
 
-- **Usage**: `help`
-- **Description**: Displays help information.
-- **Options**: None
-- **Expected Behavior**: Shows help information for commands.
-- **Output**: Help information.
+- **Usage**: `gw help [command]`
+- **Description**: Displays help information for Geoweaver commands.
+- **Arguments**: Optional command name to get specific help
 
 ### history
 
-- **Usage**: `history`
-- **Description**: Displays command history.
-- **Options**: None
-- **Expected Behavior**: Shows the history of executed commands.
-- **Output**: Command history.
+- **Usage**: `gw history [OPTIONS] COMMAND [ARGS]...`
+- **Description**: History commands for Geoweaver.
+- **Commands**:
+  - `get_process`: Get list of history for a process using process id.
+  - `get_workflow`: Get list of history for a workflow using workflow id.
+  - `show`: Show history for a workflow or process.
+- **Examples**:
+  ```shell
+  # Get history for a specific process
+  gw history get_process <process_id>
+  
+  # Get history for a specific workflow
+  gw history get_workflow <workflow_id>
+  
+  # Show detailed history information
+  gw history show <history_id>
+  ```
 
 ### import
 
-- **Usage**: `import`
-- **Description**: Imports data from a specified source.
+- **Usage**: `gw import [OPTIONS] COMMAND [ARGS]...`
+- **Description**: Import commands for Geoweaver.
 - **Options**:
-  - `-s <source>`: Specify the import source.
-- **Expected Behavior**: Imports data from the specified source.
-- **Output**: Confirmation of data import.
+  - `--help`: Show this message and exit.
 
-### interface
+- **Commands**:
+  - **workflow**: Import a workflow from a zip file.
+    - **Usage**: `gw import workflow <workflow_zip_file_path>`
+    - **Description**: Imports a workflow from a zip file.
+    - **Arguments**:
+      - `workflow_zip_file_path`: Path to the Geoweaver workflow zip file
 
-- **Usage**: `interface`
-- **Description**: Manages interface settings.
-- **Options**:
-  - `-s <setting>`: Specify the setting to manage.
-- **Expected Behavior**: Adjusts interface settings.
-- **Output**: Confirmation of setting adjustment.
-
-### list
-
-- **Usage**: `list`
-- **Description**: Lists available objects.
-- **Options**:
-  - `-t <type>`: Specify the type of objects to list.
-- **Expected Behavior**: Lists objects of the specified type.
-- **Output**: List of objects.
-
-### run
-
-- **Usage**: `run`
-- **Description**: Executes a specified command.
-- **Options**:
-  - `-c <command>`: Specify the command to execute.
-- **Expected Behavior**: Runs the specified command.
-- **Output**: Command execution result.
-
-### sync
-
-- **Usage**: `sync`
-- **Description**: Synchronizes data.
-- **Options**: None
-- **Expected Behavior**: Synchronizes data between sources.
-- **Output**: Confirmation of synchronization.
-
-### upgrade
-
-- **Usage**: `upgrade`
-- **Description**: Upgrades the application.
-- **Options**: None
-- **Expected Behavior**: Upgrades to the latest version.
-- **Output**: Confirmation of upgrade.
+For detailed usage examples and additional information, please refer to the [PyGeoWeaver Documentation](https://pygeoweaver.readthedocs.io/).
