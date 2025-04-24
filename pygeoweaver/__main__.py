@@ -24,6 +24,7 @@ from pygeoweaver import (
     helpwith,
     clean_h2db,
 )
+from pygeoweaver.commands.pgw_cleanup import cleanup_workspace
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
 from pygeoweaver.commands.pgw_create import create_process, create_process_from_file, create_workflow
 from pygeoweaver.commands.pgw_detail import get_process_code
@@ -84,6 +85,14 @@ def reset_password_command():
     Reset the password for localhost.
     """
     reset_password()
+
+
+@geoweaver.command("cleanup_workspace")
+def cleanup_workspace_command():
+    """
+    Clean up temporary directories in the gw-workspace folder.
+    """
+    cleanup_workspace()
 
 
 @geoweaver.group("create")
@@ -555,6 +564,50 @@ def upgrade_command(force, no_start):
         click.echo(click.style("Geoweaver upgrade completed successfully!", fg='green', bold=True))
     else:
         click.echo(click.style("Geoweaver upgrade failed. Check the logs for details.", fg='red', bold=True))
+
+
+from pygeoweaver.commands.pgw_cleanup import cleanup_workspace
+
+@geoweaver.command("installjdk")
+@click.option('--install-dir', help='Custom installation directory for JDK', type=str)
+@click.option('--version', default="11.0.18-10", help='JDK version to install', type=str)
+def install_jdk_command(install_dir, version):
+    """Force install JDK in the specified directory or home directory."""
+    from pygeoweaver.jdk_utils import install_jdk_macos, install_jdk_linux, install_jdk_windows
+    import platform
+
+    system = platform.system()
+    architecture = platform.machine()
+    
+    if install_dir:
+        os.environ['HOME'] = install_dir
+
+    if system == "Darwin":
+        if architecture == "x86_64":
+            install_jdk_macos(version, "jdk_x64_mac_hotspot")
+        elif architecture == "arm64":
+            install_jdk_macos(version, "jdk_aarch64_mac_hotspot")
+        else:
+            click.echo("Unsupported architecture.")
+
+    elif system == "Linux":
+        if architecture == "x86_64":
+            install_jdk_linux(version, "jdk_x64_linux_hotspot")
+        elif architecture == "aarch64":
+            install_jdk_linux(version, "jdk_aarch64_linux_hotspot")
+        else:
+            click.echo("Unsupported architecture.")
+
+    elif system == "Windows":
+        if architecture == "AMD64" or architecture == "x86_64":
+            install_jdk_windows(version, "jdk_x64_windows_hotspot")
+        elif architecture == "x86-32":
+            install_jdk_windows(version, "jdk_x86-32_windows_hotspot")
+        else:
+            click.echo("Unsupported architecture.")
+
+    else:
+        click.echo("Unsupported platform.")
 
 
 if __name__ == "__main__":
