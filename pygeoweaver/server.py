@@ -152,7 +152,7 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
     with get_spinner(text=f'Starting Geoweaver...', spinner='dots'):
         # Start Geoweaver
         cmds = [java_path, "-jar", os.path.expanduser("~/geoweaver.jar")]
-        logger.info("Running ", " ".join(cmds))
+        logger.info("Running %s", " ".join(cmds))
         with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
             subprocess.Popen(cmds, 
                             stdout=log_file, 

@@ -536,14 +536,14 @@ def cleanh2db_command(h2_jar_path, temp_dir, db_path, username, password):
         h2_jar_path=h2_jar_path,
         temp_dir=temp_dir,
         db_path=db_path,
-        username=username,
+        db_username=username,
         password=password
     )
     
     if success:
         click.echo(click.style("H2 database cleanup completed successfully!", fg='green', bold=True))
     else:
-        click.echo(click.style("H2 database cleanup failed. Check the logs for details.", fg='red', bold=True))
+        click.echo(click.style("H2 database cleanup failed. Check $HOME/geoweaver/logs for details.", fg='red', bold=True))
 
 
 @geoweaver.command("upgrade")
@@ -563,7 +563,7 @@ def upgrade_command(force, no_start):
     if success:
         click.echo(click.style("Geoweaver upgrade completed successfully!", fg='green', bold=True))
     else:
-        click.echo(click.style("Geoweaver upgrade failed. Check the logs for details.", fg='red', bold=True))
+        click.echo(click.style("Geoweaver upgrade failed. Check $HOME/geoweaver/logs for details.", fg='red', bold=True))
 
 
 from pygeoweaver.commands.pgw_cleanup import cleanup_workspace

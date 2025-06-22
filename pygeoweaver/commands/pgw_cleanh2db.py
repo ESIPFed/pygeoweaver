@@ -21,7 +21,7 @@ from pygeoweaver.pgw_log_config import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweaver", password=None):
+def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, password=None):
     """
     Clean and reduce the size of the H2 database used by Geoweaver.
     
@@ -44,40 +44,14 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
     Returns:
         bool: True if the operation was successful, False otherwise.
     """
-    root_logger = setup_logging()
-    
-    logger = logging.getLogger(__name__)
-    
-    # Add more debug info
     logger.info("=== Starting clean_h2db function ===")
-    logger.info(f"Function parameters: h2_jar_path={h2_jar_path}, temp_dir={temp_dir}, db_path={db_path}, username={username}, password={'*' * len(password) if password else 'None'}")
+    logger.info(f"Function parameters: h2_jar_path={h2_jar_path}, temp_dir={temp_dir}, db_path={db_path}, username={db_username}, password={'*' * len(password) if password else 'None'}")
     logger.info(f"Current working directory: {os.getcwd()}")
     logger.info(f"Python executable: {os.sys.executable}")
     logger.info(f"Python version: {os.sys.version}")
     logger.info(f"Platform: {platform.platform()}")
     logger.info(f"User: {os.environ.get('USER', os.environ.get('USERNAME', 'unknown'))}")
     logger.info(f"HOME directory: {os.environ.get('HOME', os.path.expanduser('~'))}")
-    
-    # Check logging configuration
-    logger.info(f"Root logger level: {root_logger.level}")
-    logger.info(f"Root logger handlers: {len(root_logger.handlers)}")
-    for i, handler in enumerate(root_logger.handlers):
-        logger.info(f"  Handler {i}: {type(handler).__name__}, level: {handler.level}")
-        if isinstance(handler, logging.FileHandler):
-            logger.info(f"    File: {handler.baseFilename}")
-    
-    logger.info(f"Module logger level: {logger.level}")
-    logger.info(f"Module logger handlers: {len(logger.handlers)}")
-    for i, handler in enumerate(logger.handlers):
-        logger.info(f"  Handler {i}: {type(handler).__name__}, level: {handler.level}")
-    
-    # Check if the log file exists and is writable
-    home_dir = os.environ.get('HOME', os.path.expanduser('~'))
-    log_file = os.path.join(home_dir, 'geoweaver', 'logs', 'pygeoweaver.log')
-    logger.info(f"Log file path: {log_file}")
-    logger.info(f"Log file exists: {os.path.exists(log_file)}")
-    logger.info(f"Log directory exists: {os.path.exists(os.path.dirname(log_file))}")
-    logger.info(f"Log directory writable: {os.access(os.path.dirname(log_file), os.W_OK) if os.path.exists(os.path.dirname(log_file)) else 'N/A'}")
     
     # Test if logging is working
     logger.debug("Debug message test")
@@ -361,7 +335,18 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
         sql_file = os.path.join(temp_dir, "gw_backup.sql")
         logger.info(f"SQL backup file: {sql_file}")
         
-        # Prompt for password if not provided - moved outside of spinner context
+        # Prompt for username if not provided
+        if not db_username:
+            username_prompt = input("Enter database username [default: geoweaver]: ")
+            if username_prompt:
+                db_username = username_prompt
+            else:
+                db_username = "geoweaver"
+            logger.info(f"Using username: {db_username}")
+        else:
+            logger.info(f"Using provided H2 db username: {db_username}")
+
+        # Prompt for password if not provided
         if not password:
             logger.info("No password provided, prompting user...")
             import getpass
@@ -379,12 +364,12 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
                 "java", "-cp", h2_jar_path, 
                 "org.h2.tools.Script", 
                 "-url", f"jdbc:h2:{temp_db_path}", 
-                "-user", username, 
+                "-user", db_username, 
                 "-script", sql_file, 
                 "-password", password
             ]
             
-            logger.info(f"Export command: {' '.join(export_cmd[:3])} ... -url jdbc:h2:{temp_db_path} ... -user {username} ... -script {sql_file} ... -password ***")
+            logger.info(f"Export command: {' '.join(export_cmd[:3])} ... -url jdbc:h2:{temp_db_path} ... -user {db_username} ... -script {sql_file} ... -password ***")
             
             try:
                 logger.info("Executing export command...")
@@ -483,12 +468,12 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, username="geoweave
                 "java", "-cp", h2_jar_path, 
                 "org.h2.tools.RunScript", 
                 "-url", f"jdbc:h2:{db_path}", 
-                "-user", username, 
+                "-user", db_username, 
                 "-script", sql_file, 
                 "-password", password
             ]
             
-            logger.info(f"Import command: {' '.join(import_cmd[:3])} ... -url jdbc:h2:{db_path} ... -user {username} ... -script {sql_file} ... -password ***")
+            logger.info(f"Import command: {' '.join(import_cmd[:3])} ... -url jdbc:h2:{db_path} ... -user {db_username} ... -script {sql_file} ... -password ***")
             
             try:
                 logger.info("Executing import command...")
