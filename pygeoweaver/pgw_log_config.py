@@ -5,12 +5,14 @@ import os
 
 
 def setup_logging():
-    log_file = '~/geoweaver.log'
-    log_file = os.path.expanduser(log_file)
+    # Use the $HOME environment variable to set the log path
+    home_dir = os.environ.get('HOME', os.path.expanduser('~'))
+    log_file = os.path.join(home_dir, 'geoweaver', 'logs', 'pygeoweaver.log')
 
     # Ensure the directory for the log file exists, create if not
     log_dir = os.path.dirname(log_file)
     os.makedirs(log_dir, exist_ok=True)
+    
     # Get the absolute path of the current script or notebook file
     current_file = inspect.getfile(inspect.currentframe())
     current_file_path = os.path.abspath(current_file)
@@ -27,18 +29,56 @@ def setup_logging():
     with open(config_file, 'wt') as f:
         f.write(config_str)
 
+    # Configure the root logger
     fileConfig(config_file)
+    
+    # Ensure all module-level loggers also use the file handler
+    root_logger = logging.getLogger()
+    
+    # Check if the root logger has a file handler
+    has_file_handler = False
+    for handler in root_logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            has_file_handler = True
+            break
+    
+    # If no file handler is present, add one manually
+    if not has_file_handler:
+        file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+    
+    # Set the root logger level
+    root_logger.setLevel(logging.DEBUG)
+    
+    # Ensure propagation to child loggers
+    root_logger.propagate = True
+    
+    # Clean up the temporary config file
     os.remove(config_file)
+    
+    # Return the root logger for debugging purposes
+    return root_logger
 
 
 def get_logger(class_name):
     """
     Get a logger with the specified class name.
     """
+    setup_logging()
+    
     logger = logging.getLogger(class_name)
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    logger.setLevel(logging.DEBUG)  # Set to DEBUG level to capture all messages
+    
+    # Check if handlers are already present
+    if not logger.handlers:
+        # Add a console handler
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(logging.INFO)
+        logger.addHandler(console_handler)
+    
     return logger

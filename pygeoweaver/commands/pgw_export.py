@@ -28,6 +28,10 @@ def export_workflow(
     if not workflow_id:
         raise RuntimeError("Workflow id is missing")
     download_geoweaver_jar()
+
+    # Resolve the absolute path for the target file
+    absolute_target_file_path = os.path.abspath(target_file_path)
+
     subprocess.run(
         [
             get_java_bin_path(),
@@ -37,14 +41,14 @@ def export_workflow(
             "workflow",
             f"--mode={mode}",
             workflow_id,
-            target_file_path,
+            absolute_target_file_path,
         ],
         cwd=f"{get_root_dir()}/",
     )
     if unzip:
         if not unzip_directory_name:
             raise Exception("Please provide unzip directory name")
-        with zipfile.ZipFile(target_file_path, "r") as zip_ref:
+        with zipfile.ZipFile(absolute_target_file_path, "r") as zip_ref:
             zip_ref.extractall(
-                os.path.join(os.path.dirname(target_file_path), unzip_directory_name)
+                os.path.join(os.path.dirname(absolute_target_file_path), unzip_directory_name)
             )
