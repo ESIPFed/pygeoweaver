@@ -16,9 +16,11 @@ from pygeoweaver.jdk_utils import check_java, download_file
 from pygeoweaver.config_utils import get_database_url_from_properties
 from pygeoweaver.config import H2_VERSION
 from pygeoweaver.pgw_log_config import setup_logging
+from pygeoweaver.constants import GEOWEAVER_DEFAULT_DB_USERNAME, GEOWEAVER_DEFAULT_DB_PASSWORD
 
-# Ensure logging is configured
-setup_logging()
+# Always use a temp directory for logs
+log_dir = os.path.join(tempfile.gettempdir(), 'geoweaver_logs')
+setup_logging(log_dir=log_dir)
 logger = logging.getLogger(__name__)
 
 def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, password=None):
@@ -335,23 +337,17 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
         sql_file = os.path.join(temp_dir, "gw_backup.sql")
         logger.info(f"SQL backup file: {sql_file}")
         
-        # Prompt for username if not provided
+        # Set default user name
         if not db_username:
-            username_prompt = input("Enter database username [default: geoweaver]: ")
-            if username_prompt:
-                db_username = username_prompt
-            else:
-                db_username = "geoweaver"
-            logger.info(f"Using username: {db_username}")
+            db_username = GEOWEAVER_DEFAULT_DB_USERNAME
+            logger.info(f"Using default username: {db_username}")
         else:
             logger.info(f"Using provided H2 db username: {db_username}")
 
-        # Prompt for password if not provided
+        # Set default password
         if not password:
-            logger.info("No password provided, prompting user...")
-            import getpass
-            password = getpass.getpass("Enter database password: ")
-            logger.info("Password obtained from user input")
+            password = GEOWEAVER_DEFAULT_DB_PASSWORD
+            logger.info("No password provided, using default password from config.")
         else:
             logger.info("Password provided in parameters")
             

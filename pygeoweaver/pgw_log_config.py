@@ -1,35 +1,26 @@
 import logging
 import os
+import tempfile
 
-def setup_logging():
-    # Use the $HOME environment variable to set the log path
-    home_dir = os.environ.get('HOME', os.path.expanduser('~'))
-    log_file = os.path.join(home_dir, 'geoweaver', 'logs', 'pygeoweaver.log')
-
-    # Ensure the directory for the log file exists, create if not
-    log_dir = os.path.dirname(log_file)
+def setup_logging(log_dir=None):
+    """
+    Set up logging for pygeoweaver. If log_dir is not provided, use home directory (old behavior).
+    """
+    if log_dir is None:
+        home_dir = os.environ.get('HOME', os.path.expanduser('~'))
+        log_dir = os.path.join(home_dir, 'geoweaver', 'logs')
     os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'pygeoweaver.log')
 
-    # Get the root logger
     root_logger = logging.getLogger()
-    
-    # Check if handlers have already been added to this logger
     if root_logger.hasHandlers():
         return root_logger
-
     root_logger.setLevel(logging.DEBUG)
-
-    # Create a file handler
     file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)
-
-    # Create a formatter and set it for the handler
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
-
-    # Add the handler to the root logger
     root_logger.addHandler(file_handler)
-
     return root_logger
 
 def get_logger(class_name):

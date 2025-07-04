@@ -6,3 +6,5 @@ COMMON_API_HEADER = {"Content-Type": "application/json"}
 GEOWEAVER_URL = (
     "https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar"
 )
+GEOWEAVER_DEFAULT_DB_USERNAME = "geoweaver"
+GEOWEAVER_DEFAULT_DB_PASSWORD = "DFKHH9V6ME"

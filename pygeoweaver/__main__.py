@@ -37,9 +37,10 @@ from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.server import check_geoweaver_status, show
 from halo import Halo
 from pygeoweaver.utils import get_spinner
+import tempfile
 
 
-setup_logging()
+setup_logging(log_dir=os.path.join(tempfile.gettempdir(), 'geoweaver_logs'))
 
 
 @click.group()
@@ -518,11 +519,11 @@ def status():
 @click.option('--temp-dir', type=click.Path(), help='Path to a temporary directory for the recovery process. If not provided, will create one.')
 @click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, will use ~/h2/gw.')
 @click.option('--db-username', help='Username for the H2 database. Defaults to "geoweaver".')
-@click.option('--password', help='Password for the H2 database. If not provided, will prompt the user.')
+@click.option('--password', help='Password for the H2 database. Defaults to "DFKHH9V6ME".')
 def cleanh2db_command(h2_jar_path, temp_dir, db_path, db_username, password):
     """
     Clean and reduce the size of the H2 database used by Geoweaver.
-    
+
     This command follows these steps:
     1. Stop Geoweaver if it's running
     2. Create a temporary directory if one is not provided
@@ -532,6 +533,10 @@ def cleanh2db_command(h2_jar_path, temp_dir, db_path, db_username, password):
     6. Import the SQL file into a new database
     7. Start Geoweaver
     """
+    if db_username:
+        click.echo(click.style(f"[INFO] Using custom database username: {db_username}", fg='yellow'))
+    if password:
+        click.echo(click.style(f"[INFO] Using custom database password: {'*' * len(password)}", fg='yellow'))
     success = clean_h2db(
         h2_jar_path=h2_jar_path,
         temp_dir=temp_dir,
