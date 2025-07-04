@@ -213,7 +213,7 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
                 # Alternative scratch locations
                 f"/tmp/{username}",
                 # Fallback to home directory
-                os.path.join(home_dir, "geoweaver", "h2")
+                # os.path.join(home_dir, "geoweaver", "h2")
             ]
             
             logger.info(f"Potential directories to check: {potential_dirs}")
@@ -521,7 +521,13 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
         logger.info("=== clean_h2db function completed successfully ===")
         print("\nH2 database cleanup completed successfully!")
         print(f"Temporary files are stored in {temp_dir}")
-        print("You can delete these files if the database is working correctly.")
+        print(f"To delete the temporary files, run:")
+        print(f"  rm -rf '{temp_dir}'")
+        print(f"  rm -f '{sql_file}'")
+        print("\nTo verify the cleanup was successful, run:")
+        print("  gw list host")
+        print("If you see your expected hosts, the cleanup was successful.")
+        print("You can delete the temp directory above if everything works.")
         
         return True
         
