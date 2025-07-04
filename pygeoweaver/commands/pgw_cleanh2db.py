@@ -54,7 +54,6 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
     logger.info(f"Current working directory: {os.getcwd()}")
     logger.info(f"Python executable: {os.sys.executable}")
     logger.info(f"Python version: {os.sys.version}")
-    logger.info(f"Platform: {platform.platform()}")
     logger.info(f"User: {os.environ.get('USER', os.environ.get('USERNAME', 'unknown'))}")
     logger.info(f"HOME directory: {os.environ.get('HOME', os.path.expanduser('~'))}")
     
@@ -406,8 +405,21 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
                         print(f"Logs available at: {log_dir}")
                         return False
                     else:
-                        logger.info(f"SQL export successful: {sql_file_size} bytes")
-                        print(f"✅ Database exported successfully: {sql_file_size} bytes")
+                        # Always read as text
+                        with open(sql_file, 'r') as f:
+                            lines = f.readlines()
+                        if len(lines) < 10:
+                            logger.error(f"SQL export file has too few lines: {len(lines)}")
+                            print(f"\n❌ ERROR: SQL export file has too few lines!")
+                            print(f"File: {sql_file}")
+                            print(f"Lines: {len(lines)} (expected >= 10)")
+                            print(f"This indicates the database export failed or the database is empty.")
+                            print(f"\nPlease check if the database contains data and try again.")
+                            print(f"Logs available at: {log_dir}")
+                            return False
+                        
+                        logger.info(f"SQL export successful: {sql_file_size} bytes, {len(lines)} lines")
+                        print(f"✅ Database exported successfully: {sql_file_size} bytes, {len(lines)} lines")
                 else:
                     logger.error(f"SQL export file was not created: {sql_file}")
                     print(f"\n❌ ERROR: SQL export file was not created!")
