@@ -40,7 +40,7 @@ from pygeoweaver.utils import get_spinner
 import tempfile
 
 
-setup_logging(log_dir=os.path.join(tempfile.gettempdir(), 'geoweaver_logs'))
+setup_logging()
 
 
 @click.group()

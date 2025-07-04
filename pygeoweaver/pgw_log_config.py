@@ -9,6 +9,8 @@ def setup_logging(log_dir=None):
     if log_dir is None:
         home_dir = os.environ.get('HOME', os.path.expanduser('~'))
         log_dir = os.path.join(home_dir, 'geoweaver', 'logs')
+    else:
+        print(f"Using provided log directory: {log_dir}")
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, 'pygeoweaver.log')
 

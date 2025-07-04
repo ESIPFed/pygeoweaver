@@ -11,17 +11,14 @@ import tempfile
 from pathlib import Path
 
 from pygeoweaver.server import stop, start, check_geoweaver_status
-from pygeoweaver.utils import get_spinner, safe_exit, get_home_dir
+from pygeoweaver.utils import get_java_bin_path, get_spinner, safe_exit, get_home_dir
 from pygeoweaver.jdk_utils import check_java, download_file
 from pygeoweaver.config_utils import get_database_url_from_properties
 from pygeoweaver.config import H2_VERSION
 from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_DB_USERNAME, GEOWEAVER_DEFAULT_DB_PASSWORD
 
-# Always use a temp directory for logs
-log_dir = os.path.join(tempfile.gettempdir(), 'geoweaver_logs')
-setup_logging(log_dir=log_dir)
-logger = logging.getLogger(__name__)
+
 
 def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, password=None):
     """
@@ -46,6 +43,12 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
     Returns:
         bool: True if the operation was successful, False otherwise.
     """
+
+    # Always use a temp directory for logs
+    log_dir = os.path.join(tempfile.gettempdir(), 'geoweaver_logs')
+    setup_logging(log_dir=log_dir)
+    logger = logging.getLogger(__name__)
+    
     logger.info("=== Starting clean_h2db function ===")
     logger.info(f"Function parameters: h2_jar_path={h2_jar_path}, temp_dir={temp_dir}, db_path={db_path}, username={db_username}, password={'*' * len(password) if password else 'None'}")
     logger.info(f"Current working directory: {os.getcwd()}")
@@ -318,6 +321,17 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
                                 logger.info(f"Copied {src_file} to {dst_file}")
                                 logger.info(f"Destination file exists: {os.path.exists(dst_file)}")
                                 logger.info(f"Destination file size: {os.path.getsize(dst_file) if os.path.exists(dst_file) else 'N/A'} bytes")
+                                
+                                # Verify file size matches
+                                src_size = os.path.getsize(src_file)
+                                dst_size = os.path.getsize(dst_file)
+                                if src_size != dst_size:
+                                    logger.error(f"File size mismatch! Source: {src_size} bytes, Destination: {dst_size} bytes")
+                                    logger.error(f"Copy operation failed for {src_file}")
+                                    return False
+                                else:
+                                    logger.info(f"File size verification passed: {src_size} bytes")
+                                
                                 files_copied = True
                             except Exception as e:
                                 logger.error(f"Failed to copy file {src_file}: {str(e)}")
@@ -357,7 +371,7 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
             logger.info(f"Temporary database path for export: {temp_db_path}")
             
             export_cmd = [
-                "java", "-cp", h2_jar_path, 
+                get_java_bin_path(), "-cp", h2_jar_path, 
                 "org.h2.tools.Script", 
                 "-url", f"jdbc:h2:{temp_db_path}", 
                 "-user", db_username, 
@@ -379,15 +393,58 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
                 logger.info(f"SQL file exists: {os.path.exists(sql_file)}")
                 if os.path.exists(sql_file):
                     logger.info(f"SQL file size: {os.path.getsize(sql_file)} bytes")
+                    
+                    # Verify SQL file has content
+                    sql_file_size = os.path.getsize(sql_file)
+                    if sql_file_size == 0:
+                        logger.error(f"SQL export file is empty (0 bytes): {sql_file}")
+                        print(f"\n❌ ERROR: SQL export file is empty!")
+                        print(f"File: {sql_file}")
+                        print(f"Size: 0 bytes")
+                        print(f"This indicates the database export failed or the database is empty.")
+                        print(f"\nPlease check if the database contains data and try again.")
+                        print(f"Logs available at: {log_dir}")
+                        return False
+                    else:
+                        logger.info(f"SQL export successful: {sql_file_size} bytes")
+                        print(f"✅ Database exported successfully: {sql_file_size} bytes")
+                else:
+                    logger.error(f"SQL export file was not created: {sql_file}")
+                    print(f"\n❌ ERROR: SQL export file was not created!")
+                    print(f"Expected file: {sql_file}")
+                    print(f"This indicates the database export command failed.")
+                    print(f"\nLogs available at: {log_dir}")
+                    return False
             except subprocess.CalledProcessError as e:
                 logger.error(f"Failed to export database: {e.stderr}")
                 logger.error(f"Export command return code: {e.returncode}")
                 logger.error(f"Export command stdout: {e.stdout}")
                 logger.exception("Export command exception:")
+                
+                # Print error to console for immediate user notification
+                print(f"\n❌ ERROR: Database export failed!")
+                print(f"Command: {' '.join(export_cmd[:3])} ... -url jdbc:h2:{temp_db_path} ... -user {db_username} ... -script {sql_file} ... -password ***")
+                print(f"Return code: {e.returncode}")
+                print(f"Error output: {e.stderr}")
+                if e.stdout:
+                    print(f"Standard output: {e.stdout}")
+                print(f"\nPlease check:")
+                print(f"1. Database path: {temp_db_path}")
+                print(f"2. Username: {db_username}")
+                print(f"3. Database file exists and is not corrupted")
+                print(f"4. H2 JAR file: {h2_jar_path}")
+                print(f"\nLogs available at: {log_dir}")
+                
                 return False
             except Exception as e:
                 logger.error(f"Unexpected error during export: {str(e)}")
                 logger.exception("Export exception:")
+                
+                # Print error to console for immediate user notification
+                print(f"\n❌ ERROR: Unexpected error during database export!")
+                print(f"Error: {str(e)}")
+                print(f"\nLogs available at: {log_dir}")
+                
                 return False
         
         # Step 4: Remove the original database files
@@ -461,7 +518,7 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
                 
             # Build the command to import the database
             import_cmd = [
-                "java", "-cp", h2_jar_path, 
+                get_java_bin_path(), "-cp", h2_jar_path, 
                 "org.h2.tools.RunScript", 
                 "-url", f"jdbc:h2:{db_path}", 
                 "-user", db_username, 

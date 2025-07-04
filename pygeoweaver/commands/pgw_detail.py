@@ -102,7 +102,7 @@ def detail_process(process_id):
         ensure_geoweaver_started()
         process = subprocess.run(
             [
-                "java", "-jar", get_geoweaver_jar_path(), "detail",
+                get_java_bin_path(), "-jar", get_geoweaver_jar_path(), "detail",
                 "--process-id", process_id
             ],
             text=True,
@@ -137,8 +137,8 @@ def detail_host(host_id, force_restart=False, force_download=False):
         ensure_geoweaver_started()
         process = subprocess.run(
             [
-                "java", "-jar", get_geoweaver_jar_path(), "detail",
-                "--host-id", host_id
+                get_java_bin_path(), "-jar", get_geoweaver_jar_path(), 
+                "detail", "--host-id", host_id
             ],
             capture_output=True,
             text=True
