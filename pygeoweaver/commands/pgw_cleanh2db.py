@@ -18,7 +18,7 @@ from pygeoweaver.config import H2_VERSION
 from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_DB_USERNAME, GEOWEAVER_DEFAULT_DB_PASSWORD
 
-
+# Logging will be set up when the function is called
 
 def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, password=None):
     """
@@ -43,10 +43,10 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
     Returns:
         bool: True if the operation was successful, False otherwise.
     """
-
-    # Always use a temp directory for logs
+    # Set up temporary logging directory for this command only
     log_dir = os.path.join(tempfile.gettempdir(), 'geoweaver_logs')
-    setup_logging(log_dir=log_dir)
+    setup_logging(log_dir=log_dir, force_new=True)
+    
     logger = logging.getLogger(__name__)
     
     logger.info("=== Starting clean_h2db function ===")
