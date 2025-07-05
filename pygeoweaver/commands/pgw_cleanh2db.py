@@ -130,6 +130,11 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
         else:
             logger.info(f"Using provided database path: {db_path}")
         
+        # Convert db_path to absolute path if it contains relative components
+        if db_path and not os.path.isabs(db_path):
+            db_path = os.path.abspath(os.path.expanduser(db_path))
+            logger.info(f"Converted database path to absolute: {db_path}")
+        
         logger.info(f"Final database path: {db_path}")
         logger.info(f"Database directory: {os.path.dirname(db_path)}")
         logger.info(f"Database directory exists: {os.path.exists(os.path.dirname(db_path))}")
