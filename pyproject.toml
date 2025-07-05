@@ -25,6 +25,7 @@ dependencies = [
     "tabulate",
     "psutil",
     "pytest-xdist",
+    "toml",
 ]
 
 [project.urls]

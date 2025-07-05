@@ -6,6 +6,7 @@ import logging
 import os
 import typing
 import click
+from pygeoweaver.version import __version__
 from pygeoweaver import (
     detail_host,
     detail_process,
@@ -44,6 +45,7 @@ setup_logging()
 
 
 @click.group()
+@click.version_option(version=__version__, prog_name="pygeoweaver")
 def geoweaver():
     """
     Geoweaver CLI: A tool for managing workflows and processes.
