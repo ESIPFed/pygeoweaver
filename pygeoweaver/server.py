@@ -9,6 +9,11 @@ import requests
 from halo import Halo
 
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
+from pygeoweaver.h2_utils import (
+    get_safe_datasource_url_for_start,
+    maintain_h2_database_on_stop,
+    prepare_h2_database_for_start,
+)
 from pygeoweaver.jdk_utils import check_java
 from pygeoweaver.pgw_log_config import get_logger
 from pygeoweaver.utils import (
@@ -83,8 +88,12 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
 
     with get_spinner(text=f'Starting Geowaever...', spinner='dots'):
         geoweaver_jar = os.path.join(home_dir, "geoweaver.jar")
+        start_cmd = [java_cmd, "-jar", geoweaver_jar]
+        datasource_url = get_safe_datasource_url_for_start()
+        if datasource_url:
+            start_cmd.append(f"--spring.datasource.url={datasource_url}")
         print(f'"{java_cmd}" -jar "{geoweaver_jar}"')
-        subprocess.Popen([java_cmd, "-jar", geoweaver_jar], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        subprocess.Popen(start_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
         status = 0
         counter = 0
@@ -112,9 +121,12 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
             safe_exit(1)
 
 
-def stop_on_windows():
+def stop_on_windows(compact_h2: bool = True):
     print("Stopping Geoweaver...")
     subprocess.run(["taskkill", "/f", "/im", "java.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if compact_h2:
+        with get_spinner(text="Maintaining H2 database safely...", spinner="dots"):
+            maintain_h2_database_on_stop()
     print("Geoweaver stopped successfully.")
 
 
@@ -152,6 +164,9 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
     with get_spinner(text=f'Starting Geoweaver...', spinner='dots'):
         # Start Geoweaver
         cmds = [java_path, "-jar", os.path.expanduser("~/geoweaver.jar")]
+        datasource_url = get_safe_datasource_url_for_start()
+        if datasource_url:
+            cmds.append(f"--spring.datasource.url={datasource_url}")
         logger.info("Running %s", " ".join(cmds))
         with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
             subprocess.Popen(cmds, 
@@ -204,7 +219,7 @@ def find_geoweaver_processes(current_uid):
             continue  # Skip processes that have exited or are inaccessible
     return processes
 
-def stop_on_mac_linux(exit_on_finish: bool = False) -> int:
+def stop_on_mac_linux(exit_on_finish: bool = False, compact_h2: bool = True) -> int:
     with get_spinner(text='Stopping Geoweaver...', spinner='dots'):
         logger.info("Stopping any running Geoweaver processes...")
 
@@ -216,29 +231,35 @@ def stop_on_mac_linux(exit_on_finish: bool = False) -> int:
 
         if not processes:
             print("No running Geoweaver processes found for the current user.")
+        else:
+            # Attempt to kill each process
+            errors = []
+            for proc in processes:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=5)  # Wait for the process to terminate
+                    logger.info(f"Successfully stopped process {proc.info['pid']}.")
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    logger.error(f"Process {proc.info['pid']} has already exited or is inaccessible.")
+                    errors.append(f"Process {proc.info['pid']} is not accessible.")
+                except psutil.TimeoutExpired:
+                    logger.warning(f"Process {proc.info['pid']} did not terminate in time, forcing kill.")
+                    proc.kill()  # Forcefully kill if it didn't terminate in time
+                    errors.append(f"Process {proc.info['pid']} was forcefully killed.")
+
+            # Log errors if any
+            if errors:
+                for error in errors:
+                    logger.error(error)
+                print("Some processes could not be stopped.")
+                return 1
+
+        if compact_h2:
+            with get_spinner(text="Maintaining H2 database safely...", spinner="dots"):
+                maintain_h2_database_on_stop()
+
+        if not processes:
             return 0
-
-        # Attempt to kill each process
-        errors = []
-        for proc in processes:
-            try:
-                proc.terminate()
-                proc.wait(timeout=5)  # Wait for the process to terminate
-                logger.info(f"Successfully stopped process {proc.info['pid']}.")
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                logger.error(f"Process {proc.info['pid']} has already exited or is inaccessible.")
-                errors.append(f"Process {proc.info['pid']} is not accessible.")
-            except psutil.TimeoutExpired:
-                logger.warning(f"Process {proc.info['pid']} did not terminate in time, forcing kill.")
-                proc.kill()  # Forcefully kill if it didn't terminate in time
-                errors.append(f"Process {proc.info['pid']} was forcefully killed.")
-
-        # Log errors if any
-        if errors:
-            for error in errors:
-                logger.error(error)
-            print("Some processes could not be stopped.")
-            return 1
 
         # Check status of Geoweaver
         status = subprocess.run(
@@ -258,6 +279,12 @@ def stop_on_mac_linux(exit_on_finish: bool = False) -> int:
 def start(force_download=False, force_restart=False, exit_on_finish=True):
     download_geoweaver_jar(overwrite=force_download)
     check_java()
+    with get_spinner(text="Checking H2 database before start...", spinner="dots"):
+        if not prepare_h2_database_for_start():
+            print("Error: H2 database maintenance failed. Geoweaver was not started.")
+            if exit_on_finish:
+                safe_exit(1)
+            return
 
     if check_os() == 3:
         logger.debug(f"Detected Windows, running start python script..")
@@ -267,12 +294,12 @@ def start(force_download=False, force_restart=False, exit_on_finish=True):
         start_on_mac_linux(force_restart=force_restart, force_download=force_download, exit_on_finish=exit_on_finish)
 
 
-def stop(exit_on_finish: bool=False):
+def stop(exit_on_finish: bool=False, compact_h2: bool=True):
     check_java()
     if check_os() == 3:
-        stop_on_windows()
+        stop_on_windows(compact_h2=compact_h2)
     else:
-        exit_code = stop_on_mac_linux()
+        exit_code = stop_on_mac_linux(compact_h2=compact_h2)
         if exit_on_finish:
             safe_exit(exit_code)
 
