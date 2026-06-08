@@ -1,5 +1,8 @@
-import re
+import subprocess
 from unittest.mock import patch
+
+import pytest
+
 from pygeoweaver.commands.pgw_detail import (
     detail_process,
     detail_workflow,
@@ -7,45 +10,92 @@ from pygeoweaver.commands.pgw_detail import (
 )
 
 
-def clean_output(output):
-    """
-    Clean escape sequences and spinner content from the output.
-    """
-    return re.sub(r"\x1b\[.*?m|\r|\⠋.*?\⠙.*?", "", output).strip()
+def _failed_detail_result(message):
+    return subprocess.CompletedProcess(
+        args=[],
+        returncode=1,
+        stdout="",
+        stderr=message,
+    )
 
 
-# Correct mock path: Mock check_geoweaver_status where it is used (pgw_detail)
-@patch("pygeoweaver.commands.pgw_detail.check_geoweaver_status", return_value=True)
-@patch("pygeoweaver.commands.pgw_detail.ensure_server_running", return_value=None)
-def test_detail_process(mock_ensure_server, mock_check_status, capfd):
-    """
-    Test the detail_process function with a non-existing process ID.
-    """
+@patch("pygeoweaver.commands.pgw_detail.get_geoweaver_jar_path", return_value="/tmp/geoweaver.jar")
+@patch("pygeoweaver.commands.pgw_detail.get_java_bin_path", return_value="java")
+@patch("pygeoweaver.commands.pgw_detail.subprocess.run")
+@patch("pygeoweaver.commands.pgw_detail.ensure_geoweaver_started")
+@patch("pygeoweaver.commands.pgw_detail.download_geoweaver_jar")
+def test_detail_process(
+    mock_download,
+    mock_ensure_started,
+    mock_run,
+    mock_java_path,
+    mock_jar_path,
+    capsys,
+):
+    mock_run.return_value = _failed_detail_result(
+        "Error: process not found: not_existing_id"
+    )
     detail_process("not_existing_id")
-    output, err = capfd.readouterr()
-    clean_out = clean_output(output)
-    assert "Error" in clean_out or "not_existing_id" in clean_out
+    mock_ensure_started.assert_called_once()
+    mock_run.assert_called_once()
+    captured = capsys.readouterr()
+    assert "Error" in captured.out or "not_existing_id" in captured.out
 
 
-@patch("pygeoweaver.commands.pgw_detail.check_geoweaver_status", return_value=True)
-@patch("pygeoweaver.commands.pgw_detail.ensure_server_running", return_value=None)
-def test_detail_workflow(mock_ensure_server, mock_check_status, capfd):
-    """
-    Test the detail_workflow function with a non-existing workflow ID.
-    """
+@patch("pygeoweaver.commands.pgw_detail.get_geoweaver_jar_path", return_value="/tmp/geoweaver.jar")
+@patch("pygeoweaver.commands.pgw_detail.get_java_bin_path", return_value="java")
+@patch("pygeoweaver.commands.pgw_detail.subprocess.run")
+@patch("pygeoweaver.commands.pgw_detail.ensure_geoweaver_started")
+@patch("pygeoweaver.commands.pgw_detail.download_geoweaver_jar")
+def test_detail_workflow(
+    mock_download,
+    mock_ensure_started,
+    mock_run,
+    mock_java_path,
+    mock_jar_path,
+    capsys,
+):
+    mock_run.return_value = _failed_detail_result(
+        "Error: workflow not found: not_existing_id"
+    )
     detail_workflow("not_existing_id")
-    output, err = capfd.readouterr()
-    clean_out = clean_output(output)
-    assert "Error" in clean_out or "not_existing_id" in clean_out
+    mock_ensure_started.assert_called_once()
+    mock_run.assert_called_once()
+    captured = capsys.readouterr()
+    assert "Error" in captured.out or "not_existing_id" in captured.out
 
 
-@patch("pygeoweaver.commands.pgw_detail.check_geoweaver_status", return_value=True)
-@patch("pygeoweaver.commands.pgw_detail.ensure_server_running", return_value=None)
-def test_detail_host(mock_ensure_server, mock_check_status, capfd):
-    """
-    Test the detail_host function with a non-existing host ID.
-    """
+@patch("pygeoweaver.commands.pgw_detail.get_geoweaver_jar_path", return_value="/tmp/geoweaver.jar")
+@patch("pygeoweaver.commands.pgw_detail.get_java_bin_path", return_value="java")
+@patch("pygeoweaver.commands.pgw_detail.subprocess.run")
+@patch("pygeoweaver.commands.pgw_detail.ensure_geoweaver_started")
+@patch("pygeoweaver.commands.pgw_detail.download_geoweaver_jar")
+def test_detail_host(
+    mock_download,
+    mock_ensure_started,
+    mock_run,
+    mock_java_path,
+    mock_jar_path,
+    capsys,
+):
+    mock_run.return_value = _failed_detail_result(
+        "Error: host not found: not_existing_id"
+    )
     detail_host("not_existing_id")
-    output, err = capfd.readouterr()
-    clean_out = clean_output(output)
-    assert "Error" in clean_out or "not_existing_id" in clean_out
+    mock_ensure_started.assert_called_once()
+    mock_run.assert_called_once()
+    captured = capsys.readouterr()
+    assert "Error" in captured.out or "not_existing_id" in captured.out
+
+
+@pytest.mark.parametrize(
+    "func,missing_id",
+    [
+        (detail_process, ""),
+        (detail_workflow, ""),
+        (detail_host, ""),
+    ],
+)
+def test_detail_requires_id(func, missing_id):
+    with pytest.raises(RuntimeError, match="id is missing"):
+        func(missing_id)
