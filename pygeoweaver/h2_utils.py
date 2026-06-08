@@ -5,10 +5,12 @@ import logging
 import os
 import re
 import shutil
+import signal
 import subprocess
 import time
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 from pygeoweaver.config import H2_VERSION
 from pygeoweaver.config_utils import get_database_url_from_properties, read_properties_file
@@ -43,6 +45,9 @@ H2_MAINTENANCE_COOLDOWN_SECONDS = int(os.getenv("H2_MAINTENANCE_COOLDOWN_SECONDS
 H2_BACKUP_RETENTION_COUNT = int(os.getenv("H2_BACKUP_RETENTION_COUNT", "3"))
 H2_SQL_MIN_LINES = int(os.getenv("H2_SQL_MIN_LINES", "10"))
 H2_SIZE_WARN_THRESHOLD_MB = int(os.getenv("H2_SIZE_WARN_THRESHOLD_MB", "2048"))
+H2_MAINTENANCE_LOCK_STALE_SECONDS = int(os.getenv("H2_MAINTENANCE_LOCK_STALE_SECONDS", "14400"))
+H2_MAINTENANCE_LOCK_WAIT_START_SECONDS = int(os.getenv("H2_MAINTENANCE_LOCK_WAIT_START_SECONDS", "60"))
+H2_MAINTENANCE_LOCK_WAIT_STOP_SECONDS = int(os.getenv("H2_MAINTENANCE_LOCK_WAIT_STOP_SECONDS", "10"))
 H2_LOCK_RETRY_COUNT = int(os.getenv("H2_LOCK_RETRY_COUNT", "3"))
 H2_LOCK_RETRY_DELAY_SECONDS = float(os.getenv("H2_LOCK_RETRY_DELAY_SECONDS", "2"))
 
@@ -74,6 +79,255 @@ def get_h2_backup_base_dir() -> str:
 
 def _maintenance_state_path() -> str:
     return os.path.join(get_home_dir(), "geoweaver", "h2_maintenance_state.json")
+
+
+def _maintenance_lock_path() -> str:
+    return os.path.join(get_home_dir(), "geoweaver", "h2_maintenance.lock")
+
+
+def _pid_is_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _read_maintenance_lock() -> Dict[str, object]:
+    lock_path = _maintenance_lock_path()
+    if not os.path.exists(lock_path):
+        return {}
+    try:
+        with open(lock_path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except Exception as exc:
+        logger.warning("Could not read H2 maintenance lock: %s", exc)
+        return {}
+
+
+def _is_stale_maintenance_lock() -> bool:
+    lock_info = _read_maintenance_lock()
+    if not lock_info:
+        return True
+
+    pid = lock_info.get("pid")
+    if pid is not None and not _pid_is_alive(int(pid)):
+        return True
+
+    started_at = lock_info.get("started_at")
+    if started_at:
+        try:
+            age_seconds = time.time() - datetime.fromisoformat(str(started_at)).timestamp()
+            if age_seconds > H2_MAINTENANCE_LOCK_STALE_SECONDS:
+                return True
+        except ValueError:
+            return True
+
+    return False
+
+
+def release_maintenance_lock() -> None:
+    """Release the cross-process H2 maintenance lock."""
+    try:
+        os.remove(_maintenance_lock_path())
+    except FileNotFoundError:
+        pass
+
+
+def acquire_maintenance_lock(wait_seconds: int) -> bool:
+    """Acquire an exclusive maintenance lock, waiting briefly for other gw processes."""
+    lock_path = _maintenance_lock_path()
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    deadline = time.time() + wait_seconds
+
+    while time.time() < deadline:
+        if os.path.exists(lock_path) and _is_stale_maintenance_lock():
+            logger.warning("Removing stale H2 maintenance lock at %s", lock_path)
+            release_maintenance_lock()
+
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(
+                    {"pid": os.getpid(), "started_at": datetime.now().isoformat()},
+                    handle,
+                )
+            return True
+        except FileExistsError:
+            time.sleep(1)
+
+    logger.warning("Timed out waiting for H2 maintenance lock")
+    return False
+
+
+def _in_progress_marker_path(work_dir: str) -> str:
+    return os.path.join(work_dir, ".in_progress")
+
+
+def _mark_maintenance_in_progress(work_dir: str, phase: str) -> None:
+    marker_path = _in_progress_marker_path(work_dir)
+    with open(marker_path, "w", encoding="utf-8") as handle:
+        json.dump(
+            {"started_at": datetime.now().isoformat(), "pid": os.getpid(), "phase": phase},
+            handle,
+        )
+
+
+def _clear_maintenance_in_progress(work_dir: Optional[str]) -> None:
+    if not work_dir:
+        return
+    try:
+        os.remove(_in_progress_marker_path(work_dir))
+    except FileNotFoundError:
+        pass
+
+
+def _find_recoverable_work_dirs(db_basename: str) -> List[str]:
+    backup_root = get_h2_backup_base_dir()
+    if not os.path.isdir(backup_root):
+        return []
+
+    candidates = []
+    for entry in os.listdir(backup_root):
+        work_dir = os.path.join(backup_root, entry)
+        if not os.path.isdir(work_dir):
+            continue
+        original_dir = os.path.join(work_dir, "original")
+        marker_path = _in_progress_marker_path(work_dir)
+        if os.path.exists(marker_path) or get_matching_db_files(original_dir, db_basename):
+            if get_matching_db_files(original_dir, db_basename):
+                candidates.append(work_dir)
+
+    candidates.sort(key=os.path.getmtime, reverse=True)
+    return candidates
+
+
+def recover_from_interrupted_maintenance(
+    db_path: Optional[str] = None,
+    db_username: Optional[str] = None,
+    password: Optional[str] = None,
+    h2_jar_path: Optional[str] = None,
+) -> bool:
+    """
+    Repair production database state after Ctrl+C, crashes, or partial maintenance.
+
+    Prefers the newest interrupted work directory with an original/ backup, then
+    falls back to the latest retained backup set.
+    """
+    resolved_db_path = resolve_h2_db_path(db_path)
+    db_dir = os.path.dirname(resolved_db_path)
+    db_basename = os.path.basename(resolved_db_path)
+    db_username = db_username or GEOWEAVER_DEFAULT_DB_USERNAME
+    password = password or GEOWEAVER_DEFAULT_DB_PASSWORD
+
+    if os.path.exists(_maintenance_lock_path()) and _is_stale_maintenance_lock():
+        logger.warning("Clearing stale H2 maintenance lock before recovery")
+        release_maintenance_lock()
+
+    if verify_h2_database(
+        resolved_db_path,
+        db_username=db_username,
+        password=password,
+        h2_jar_path=h2_jar_path,
+    ):
+        for work_dir in _find_recoverable_work_dirs(db_basename):
+            _clear_maintenance_in_progress(work_dir)
+        state = _load_maintenance_state()
+        state.pop("interrupted_maintenance", None)
+        _save_maintenance_state(state)
+        return True
+
+    logger.warning("Production H2 database is unreadable; attempting recovery")
+
+    for work_dir in _find_recoverable_work_dirs(db_basename):
+        original_dir = os.path.join(work_dir, "original")
+        if restore_database_from_backup(original_dir, db_dir, db_basename):
+            if verify_h2_database(
+                resolved_db_path,
+                db_username=db_username,
+                password=password,
+                h2_jar_path=h2_jar_path,
+            ):
+                logger.info(
+                    "Recovered production database from interrupted maintenance backup at %s",
+                    work_dir,
+                )
+                _clear_maintenance_in_progress(work_dir)
+                state = _load_maintenance_state()
+                state.pop("interrupted_maintenance", None)
+                state["pending_rebuild"] = False
+                _save_maintenance_state(state)
+                return True
+
+    if restore_from_latest_backup(resolved_db_path):
+        recovered = verify_h2_database(
+            resolved_db_path,
+            db_username=db_username,
+            password=password,
+            h2_jar_path=h2_jar_path,
+        )
+        if recovered:
+            logger.info("Recovered production database from latest retained backup")
+        return recovered
+
+    logger.error("Could not recover production H2 database from interrupted maintenance")
+    return False
+
+
+@contextmanager
+def h2_maintenance_guard(trigger: str = "stop") -> Iterator[bool]:
+    """
+    Serialize maintenance, recover partial runs, and handle Ctrl+C safely.
+
+    Yields:
+        bool: True when this process should run maintenance, False when skipped.
+    """
+    recover_from_interrupted_maintenance()
+
+    wait_seconds = (
+        H2_MAINTENANCE_LOCK_WAIT_START_SECONDS
+        if trigger == "start"
+        else H2_MAINTENANCE_LOCK_WAIT_STOP_SECONDS
+    )
+    if not acquire_maintenance_lock(wait_seconds=wait_seconds):
+        logger.warning("Another gw process is maintaining the H2 database; skipping %s maintenance", trigger)
+        yield False
+        return
+
+    interrupted = {"value": False}
+
+    def _handle_interrupt(signum, frame):
+        interrupted["value"] = True
+        logger.warning("H2 maintenance interrupted by signal %s", signum)
+        state = _load_maintenance_state()
+        state["interrupted_maintenance"] = True
+        state["pending_rebuild"] = True
+        _save_maintenance_state(state)
+        recover_from_interrupted_maintenance()
+        release_maintenance_lock()
+        raise KeyboardInterrupt
+
+    previous_sigint = signal.getsignal(signal.SIGINT)
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+    signal.signal(signal.SIGINT, _handle_interrupt)
+    signal.signal(signal.SIGTERM, _handle_interrupt)
+
+    try:
+        yield True
+    except KeyboardInterrupt:
+        if not interrupted["value"]:
+            state = _load_maintenance_state()
+            state["interrupted_maintenance"] = True
+            state["pending_rebuild"] = True
+            _save_maintenance_state(state)
+            recover_from_interrupted_maintenance()
+        raise
+    finally:
+        signal.signal(signal.SIGINT, previous_sigint)
+        signal.signal(signal.SIGTERM, previous_sigterm)
+        release_maintenance_lock()
 
 
 def _load_maintenance_state() -> Dict[str, object]:
@@ -568,6 +822,7 @@ def rebuild_h2_database_safely(
     os.makedirs(original_dir, exist_ok=True)
     os.makedirs(rebuilt_dir, exist_ok=True)
     os.makedirs(displaced_dir, exist_ok=True)
+    _mark_maintenance_in_progress(work_dir, "backup")
 
     size_before = get_h2_database_size_bytes(resolved_db_path)
     logger.info(
@@ -625,6 +880,7 @@ def rebuild_h2_database_safely(
     if not _validate_sql_export(sql_file):
         return False, work_dir
 
+    _mark_maintenance_in_progress(work_dir, "import")
     rebuilt_db_path = os.path.join(rebuilt_dir, db_basename)
     import_cmd = [
         get_java_bin_path(),
@@ -660,6 +916,7 @@ def rebuild_h2_database_safely(
         logger.error("Rebuilt database verification failed for %s", rebuilt_db_path)
         return False, work_dir
 
+    _mark_maintenance_in_progress(work_dir, "promote")
     os.makedirs(db_dir, exist_ok=True)
     if not promote_rebuilt_database(
         production_dir=db_dir,
@@ -678,8 +935,105 @@ def rebuild_h2_database_safely(
         work_dir,
     )
     _record_maintenance("rebuild", size_after, work_dir)
+    _clear_maintenance_in_progress(work_dir)
     prune_old_h2_backups()
     return True, work_dir
+
+
+def _run_automatic_h2_maintenance_body(
+    trigger: str,
+    force_rebuild: bool,
+    resolved_db_path: str,
+    db_username: str,
+    password: str,
+    h2_jar_path: Optional[str],
+    size_bytes: int,
+) -> bool:
+    size_mb = size_bytes / (1024 * 1024)
+    state = _load_maintenance_state()
+
+    if not force_rebuild and _should_skip_recent_maintenance(state):
+        logger.info("Skipping H2 maintenance: completed recently")
+        if trigger == "start" and not verify_h2_database(
+            resolved_db_path,
+            db_username=db_username,
+            password=password,
+            h2_jar_path=h2_jar_path,
+        ):
+            logger.warning("Recent maintenance recorded but production database is unreadable")
+            return recover_from_interrupted_maintenance(
+                resolved_db_path,
+                db_username=db_username,
+                password=password,
+                h2_jar_path=h2_jar_path,
+            )
+        return True
+
+    production_ok = _wait_for_database_unlock(
+        resolved_db_path,
+        db_username=db_username,
+        password=password,
+        h2_jar_path=h2_jar_path,
+    )
+
+    if trigger == "start" and not production_ok:
+        logger.warning("Production H2 database failed verification before start")
+        if recover_from_interrupted_maintenance(
+            resolved_db_path,
+            db_username=db_username,
+            password=password,
+            h2_jar_path=h2_jar_path,
+        ):
+            production_ok = True
+        if not production_ok and not _needs_rebuild(size_mb, state, force_rebuild):
+            logger.error("Production H2 database is unreadable and could not be recovered")
+            return False
+
+    if _needs_rebuild(size_mb, state, force_rebuild):
+        logger.info(
+            "Automatic H2 rebuild triggered (%s, %.2f MB, threshold=%d MB)",
+            trigger,
+            size_mb,
+            H2_AUTO_REBUILD_THRESHOLD_MB,
+        )
+        success, work_dir = rebuild_h2_database_safely(
+            db_path=resolved_db_path,
+            db_username=db_username,
+            password=password,
+            h2_jar_path=h2_jar_path,
+            force=True,
+        )
+        if not success:
+            state["pending_rebuild"] = True
+            state["interrupted_maintenance"] = True
+            _save_maintenance_state(state)
+            logger.error("Automatic H2 rebuild failed; production was left unchanged when possible")
+            return trigger != "start"
+        return True
+
+    if trigger == "stop" and _needs_compact(size_mb, state):
+        logger.info("Automatic H2 compact triggered on stop (%.2f MB)", size_mb)
+        if compact_h2_database(
+            db_path=resolved_db_path,
+            db_username=db_username,
+            password=password,
+            h2_jar_path=h2_jar_path,
+        ):
+            compact_size = get_h2_database_size_bytes(resolved_db_path)
+            _record_maintenance("compact", compact_size)
+            return True
+
+        state["pending_rebuild"] = True
+        _save_maintenance_state(state)
+        logger.warning("Automatic H2 compact failed; full rebuild will be attempted next time")
+        return True
+
+    if trigger == "start" and not production_ok:
+        logger.error("Production H2 database is not readable after maintenance checks")
+        return False
+
+    logger.info("H2 database healthy (%.2f MB); no maintenance required", size_mb)
+    return True
 
 
 def run_automatic_h2_maintenance(
@@ -715,85 +1069,26 @@ def run_automatic_h2_maintenance(
         logger.warning("Geoweaver is still running; H2 maintenance cannot run safely")
         return trigger != "start"
 
-    size_mb = size_bytes / (1024 * 1024)
-    state = _load_maintenance_state()
-
-    if not force_rebuild and _should_skip_recent_maintenance(state):
-        logger.info("Skipping H2 maintenance: completed recently")
-        if trigger == "start" and not verify_h2_database(
-            resolved_db_path,
-            db_username=db_username,
-            password=password,
-            h2_jar_path=h2_jar_path,
-        ):
-            logger.warning("Recent maintenance recorded but production database is unreadable")
-            return restore_from_latest_backup(resolved_db_path)
-        return True
-
-    production_ok = _wait_for_database_unlock(
-        resolved_db_path,
-        db_username=db_username,
-        password=password,
-        h2_jar_path=h2_jar_path,
-    )
-
-    if trigger == "start" and not production_ok:
-        logger.warning("Production H2 database failed verification before start")
-        if restore_from_latest_backup(resolved_db_path):
-            production_ok = verify_h2_database(
-                resolved_db_path,
-                db_username=db_username,
-                password=password,
-                h2_jar_path=h2_jar_path,
-            )
-        if not production_ok and not _needs_rebuild(size_mb, state, force_rebuild):
-            logger.error("Production H2 database is unreadable and no backup could be restored")
-            return False
-
-    if _needs_rebuild(size_mb, state, force_rebuild):
-        logger.info(
-            "Automatic H2 rebuild triggered (%s, %.2f MB, threshold=%d MB)",
-            trigger,
-            size_mb,
-            H2_AUTO_REBUILD_THRESHOLD_MB,
-        )
-        success, work_dir = rebuild_h2_database_safely(
-            db_path=resolved_db_path,
-            db_username=db_username,
-            password=password,
-            h2_jar_path=h2_jar_path,
-            force=True,
-        )
-        if not success:
-            state["pending_rebuild"] = True
-            _save_maintenance_state(state)
-            logger.error("Automatic H2 rebuild failed; production was left unchanged when possible")
-            return trigger != "start"
-        return True
-
-    if trigger == "stop" and _needs_compact(size_mb, state):
-        logger.info("Automatic H2 compact triggered on stop (%.2f MB)", size_mb)
-        if compact_h2_database(
-            db_path=resolved_db_path,
-            db_username=db_username,
-            password=password,
-            h2_jar_path=h2_jar_path,
-        ):
-            compact_size = get_h2_database_size_bytes(resolved_db_path)
-            _record_maintenance("compact", compact_size)
+    with h2_maintenance_guard(trigger) as should_run:
+        if not should_run:
+            if trigger == "start":
+                return recover_from_interrupted_maintenance(
+                    resolved_db_path,
+                    db_username=db_username,
+                    password=password,
+                    h2_jar_path=h2_jar_path,
+                )
             return True
 
-        state["pending_rebuild"] = True
-        _save_maintenance_state(state)
-        logger.warning("Automatic H2 compact failed; full rebuild will be attempted next time")
-        return True
-
-    if trigger == "start" and not production_ok:
-        logger.error("Production H2 database is not readable after maintenance checks")
-        return False
-
-    logger.info("H2 database healthy (%.2f MB); no maintenance required", size_mb)
-    return True
+        return _run_automatic_h2_maintenance_body(
+            trigger=trigger,
+            force_rebuild=force_rebuild,
+            resolved_db_path=resolved_db_path,
+            db_username=db_username,
+            password=password,
+            h2_jar_path=h2_jar_path,
+            size_bytes=size_bytes,
+        )
 
 
 def get_safe_datasource_url_for_start() -> Optional[str]:

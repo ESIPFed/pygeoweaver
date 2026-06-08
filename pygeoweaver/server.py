@@ -150,10 +150,6 @@ def check_java_exists():
 
 
 def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, exit_on_finish: bool=False):
-    if force_restart:
-        # First stop any existing Geoweaver
-        stop_on_mac_linux(exit_on_finish=exit_on_finish)
-
     # Checking Java
     java_path = check_java_exists()
     if java_path is None:
@@ -198,6 +194,22 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
             print("Success: Geoweaver is up")
             if exit_on_finish:
                 safe_exit(0)
+
+
+def _wait_for_geoweaver_shutdown(timeout_seconds: int = 30) -> bool:
+    """Wait until Geoweaver JVM processes have fully exited before H2 maintenance."""
+    if check_os() == 3:
+        return True
+
+    current_uid = os.getuid()
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        if not find_geoweaver_processes(current_uid):
+            return True
+        time.sleep(1)
+
+    logger.warning("Timed out waiting for Geoweaver processes to exit")
+    return False
 
 
 def find_geoweaver_processes(current_uid):
@@ -254,6 +266,8 @@ def stop_on_mac_linux(exit_on_finish: bool = False, compact_h2: bool = True) -> 
                 print("Some processes could not be stopped.")
                 return 1
 
+        _wait_for_geoweaver_shutdown()
+
         if compact_h2:
             with get_spinner(text="Maintaining H2 database safely...", spinner="dots"):
                 maintain_h2_database_on_stop()
@@ -279,6 +293,15 @@ def stop_on_mac_linux(exit_on_finish: bool = False, compact_h2: bool = True) -> 
 def start(force_download=False, force_restart=False, exit_on_finish=True):
     download_geoweaver_jar(overwrite=force_download)
     check_java()
+
+    if force_restart:
+        stop(exit_on_finish=False, compact_h2=True)
+    elif check_geoweaver_status():
+        print("Geoweaver is already running.")
+        if exit_on_finish:
+            safe_exit(0)
+        return
+
     with get_spinner(text="Checking H2 database before start...", spinner="dots"):
         if not prepare_h2_database_for_start():
             print("Error: H2 database maintenance failed. Geoweaver was not started.")

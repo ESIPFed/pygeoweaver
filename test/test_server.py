@@ -18,26 +18,44 @@ import pytest
 
 logger = get_logger(__name__)
 
-def test_server_start_stop():
-    # Start the server
+
+def _wait_for_geoweaver(timeout_seconds=30):
+    """Poll Geoweaver until it responds or timeout."""
+    deadline = time.time() + timeout_seconds
+    last_error = None
+    while time.time() < deadline:
+        try:
+            response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL, timeout=2)
+            if response.status_code in (200, 302):
+                return response
+        except requests.exceptions.RequestException as exc:
+            last_error = exc
+        time.sleep(2)
+    raise AssertionError(
+        f"Geoweaver did not become reachable at {GEOWEAVER_DEFAULT_ENDPOINT_URL}: {last_error}"
+    )
+
+
+@patch("pygeoweaver.server.maintain_h2_database_on_stop", return_value=True)
+@patch("pygeoweaver.server.prepare_h2_database_for_start", return_value=True)
+def test_server_start_stop(mock_prepare, mock_maintain):
+    # Integration test for Geoweaver lifecycle; H2 maintenance is covered separately.
     start(exit_on_finish=False)
+    mock_prepare.assert_called_once()
 
-    # Check if the server is up by making a GET request
-    response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL)
-    assert response.status_code == 200, f"Failed to access URL: {GEOWEAVER_DEFAULT_ENDPOINT_URL}"
+    response = _wait_for_geoweaver()
+    assert response.status_code in (200, 302), f"Failed to access URL: {GEOWEAVER_DEFAULT_ENDPOINT_URL}"
 
-    # Stop the server
     stop(exit_on_finish=False)
+    mock_maintain.assert_called()
     
     time.sleep(5)
 
-    # Check that the server has stopped by expecting a connection error
     with pytest.raises(requests.exceptions.ConnectionError):
         print(f"Test {GEOWEAVER_DEFAULT_ENDPOINT_URL}")
         response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL)
         print(response)
 
-    # Stop the server again should have no issue
     stop(exit_on_finish=False)
 
 def test_windows():

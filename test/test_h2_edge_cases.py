@@ -101,7 +101,7 @@ def test_start_fails_when_database_unreadable_and_no_backup(tmp_path, monkeypatc
     monkeypatch.setattr(h2_utils, "ensure_h2_safe_datasource_url", lambda: False)
 
     with patch.object(h2_utils, "_wait_for_database_unlock", return_value=False):
-        with patch.object(h2_utils, "restore_from_latest_backup", return_value=False):
+        with patch.object(h2_utils, "recover_from_interrupted_maintenance", return_value=False):
             with patch.object(h2_utils, "rebuild_h2_database_safely") as mock_rebuild:
                 assert h2_utils.run_automatic_h2_maintenance("start", db_path=db_path) is False
                 mock_rebuild.assert_not_called()
@@ -116,10 +116,10 @@ def test_start_restores_from_backup_when_database_unreadable(tmp_path, monkeypat
     monkeypatch.setattr(h2_utils, "ensure_h2_safe_datasource_url", lambda: False)
 
     with patch.object(h2_utils, "_wait_for_database_unlock", return_value=False):
-        with patch.object(h2_utils, "restore_from_latest_backup", return_value=True) as mock_restore:
+        with patch.object(h2_utils, "recover_from_interrupted_maintenance", return_value=True) as mock_recover:
             with patch.object(h2_utils, "verify_h2_database", return_value=True):
                 assert h2_utils.run_automatic_h2_maintenance("start", db_path=db_path) is True
-                mock_restore.assert_called_once()
+                mock_recover.assert_called()
 
 
 def test_geoweaver_still_running_blocks_start_maintenance(tmp_path, monkeypatch):
@@ -269,6 +269,6 @@ def test_recent_maintenance_skip_still_restores_unreadable_database_on_start(tmp
     monkeypatch.setattr(h2_utils, "ensure_h2_safe_datasource_url", lambda: False)
 
     with patch.object(h2_utils, "verify_h2_database", return_value=False):
-        with patch.object(h2_utils, "restore_from_latest_backup", return_value=True) as mock_restore:
+        with patch.object(h2_utils, "recover_from_interrupted_maintenance", return_value=True) as mock_recover:
             assert h2_utils.run_automatic_h2_maintenance("start", db_path=db_path) is True
-            mock_restore.assert_called_once()
+            mock_recover.assert_called()

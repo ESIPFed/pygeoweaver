@@ -1,9 +1,16 @@
 import tempfile
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from pygeoweaver.commands.pgw_cleanh2db import clean_h2db
 
 
+@contextmanager
+def _guard_always_run(_trigger=None):
+    yield True
+
+
+@patch("pygeoweaver.commands.pgw_cleanh2db.h2_maintenance_guard", _guard_always_run)
 @patch("pygeoweaver.commands.pgw_cleanh2db.start")
 @patch("pygeoweaver.commands.pgw_cleanh2db.rebuild_h2_database_safely", return_value=(True, "/tmp/backup"))
 @patch("pygeoweaver.commands.pgw_cleanh2db.get_h2_jar_path", return_value="h2.jar")
@@ -24,6 +31,7 @@ def test_cleanh2db_success(
     mock_rebuild.assert_called_once()
 
 
+@patch("pygeoweaver.commands.pgw_cleanh2db.h2_maintenance_guard", _guard_always_run)
 @patch("pygeoweaver.commands.pgw_cleanh2db.start")
 @patch("pygeoweaver.commands.pgw_cleanh2db.rebuild_h2_database_safely", return_value=(False, "/tmp/backup"))
 @patch("pygeoweaver.commands.pgw_cleanh2db.get_h2_jar_path", return_value="h2.jar")

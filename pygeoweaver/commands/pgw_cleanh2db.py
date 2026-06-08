@@ -12,6 +12,7 @@ from pygeoweaver.constants import GEOWEAVER_DEFAULT_DB_USERNAME, GEOWEAVER_DEFAU
 from pygeoweaver.h2_utils import (
     get_h2_backup_base_dir,
     get_h2_jar_path,
+    h2_maintenance_guard,
     rebuild_h2_database_safely,
     resolve_h2_db_path,
 )
@@ -62,14 +63,20 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
         )
 
         with get_spinner(text="Safely rebuilding H2 database...", spinner="dots"):
-            success, work_dir = rebuild_h2_database_safely(
-                db_path=resolved_db_path,
-                db_username=db_username,
-                password=password,
-                h2_jar_path=h2_jar_path,
-                work_base_dir=work_base_dir,
-                force=True,
-            )
+            with h2_maintenance_guard("stop") as should_run:
+                if not should_run:
+                    logger.error("Another gw process is already maintaining the H2 database")
+                    print("\n❌ ERROR: Another Geoweaver maintenance operation is already running.")
+                    print("Wait for it to finish, then retry `gw cleanh2db`.")
+                    return False
+                success, work_dir = rebuild_h2_database_safely(
+                    db_path=resolved_db_path,
+                    db_username=db_username,
+                    password=password,
+                    h2_jar_path=h2_jar_path,
+                    work_base_dir=work_base_dir,
+                    force=True,
+                )
 
         if not success:
             logger.error("Manual H2 cleanup failed")
