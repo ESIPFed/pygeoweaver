@@ -9,6 +9,7 @@ from pygeoweaver.server import show
 
 @patch("pygeoweaver.server._wait_for_geoweaver_shutdown", return_value=True)
 @patch("pygeoweaver.server.find_geoweaver_processes", return_value=[])
+@patch("pygeoweaver.server.warn_oversized_h2_on_lifecycle")
 @patch("pygeoweaver.server.maintain_h2_database_on_stop", return_value=True)
 @patch("pygeoweaver.server.prepare_h2_database_for_start", return_value=True)
 @patch("pygeoweaver.server.check_geoweaver_status", return_value=False)
@@ -24,10 +25,11 @@ def test_server_start_stop(
     mock_status,
     mock_prepare,
     mock_maintain,
+    mock_warn,
     mock_find_procs,
     mock_wait_shutdown,
 ):
-    """Start must run H2 prep then platform start; stop must run H2 maintenance."""
+    """Start runs H2 prep; default stop warns on size and does not compact/rebuild."""
     start(exit_on_finish=False)
     mock_prepare.assert_called_once()
     mock_start_mac.assert_called_once_with(
@@ -37,8 +39,12 @@ def test_server_start_stop(
     )
 
     stop(exit_on_finish=False)
-    mock_maintain.assert_called()
+    mock_warn.assert_called()
+    mock_maintain.assert_not_called()
     mock_wait_shutdown.assert_called()
+
+    stop(exit_on_finish=False, maintain_h2=True)
+    mock_maintain.assert_called_with(allow_compact=True)
 
 
 def test_windows():

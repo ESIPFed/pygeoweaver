@@ -1,0 +1,8 @@
+{
+  "slug": "h2-clean-reliability",
+  "mode": "feature_change",
+  "current_change": "CHG-0001",
+  "current_stage": "C0",
+  "repo": "ESIPFed/pygeoweaver",
+  "code_root": "../.."
+}

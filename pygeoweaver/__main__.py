@@ -64,11 +64,17 @@ def start_command(force_download, force_restart):
 
 
 @geoweaver.command("stop")
-def stop_command():
+@click.option(
+    "--maintain-h2",
+    is_flag=True,
+    default=False,
+    help="After stopping, optionally compact H2 (short timeout). Full rebuild: gw cleanh2db",
+)
+def stop_command(maintain_h2):
     """
-    Start the Geoweaver application.
+    Stop the Geoweaver application.
     """
-    stop(exit_on_finish=True)
+    stop(exit_on_finish=True, maintain_h2=maintain_h2)
 
 @geoweaver.command("show")
 @click.option('--geoweaver-url', default=GEOWEAVER_DEFAULT_ENDPOINT_URL, help='Geoweaver URL (default is GEOWEAVER_DEFAULT_ENDPOINT_URL)')
@@ -518,22 +524,26 @@ def status():
 
 @geoweaver.command("cleanh2db")
 @click.option('--h2-jar-path', type=click.Path(exists=True), help='Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.')
-@click.option('--temp-dir', type=click.Path(), help='Path to a temporary directory for the recovery process. If not provided, will create one.')
-@click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, will use ~/h2/gw.')
+@click.option('--temp-dir', type=click.Path(), help='Work/backup directory for export+rebuild (default: ~/geoweaver/h2_backups). Registered for crash recovery.')
+@click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, uses application.properties or ~/h2/gw.')
 @click.option('--db-username', help='Username for the H2 database. Defaults to "geoweaver".')
-@click.option('--password', help='Password for the H2 database. Defaults to "DFKHH9V6ME".')
+@click.option('--password', help='Password for the H2 database. Defaults to the built-in Geoweaver H2 password.')
 def cleanh2db_command(h2_jar_path, temp_dir, db_path, db_username, password):
     """
     Clean and reduce the size of the H2 database used by Geoweaver.
 
-    This command follows these steps:
-    1. Stop Geoweaver if it's running
-    2. Create a temporary directory if one is not provided
-    3. Copy database files to the temporary directory
-    4. Export data from the database to a SQL file
-    5. Remove the original database files
-    6. Import the SQL file into a new database
-    7. Start Geoweaver
+    Safe verify-then-promote pipeline (production is not replaced until the
+    rebuilt database passes connectivity and table-inventory checks):
+
+    1. Stop Geoweaver if it is running
+    2. Copy production DB into a timestamped work directory (original/)
+    3. Export data to SQL and import into a side rebuilt/ database
+    4. Verify rebuilt DB (open + WORKFLOW/GWPROCESS/HOST row counts)
+    5. Promote rebuilt files into production only after verification
+    6. Start Geoweaver
+
+    On failure or interrupt before a successful promote, production is left
+    unchanged (or restored from original/). Fail closed — never "always succeed".
     """
     if db_username:
         click.echo(click.style(f"[INFO] Using custom database username: {db_username}", fg='yellow'))
@@ -550,7 +560,7 @@ def cleanh2db_command(h2_jar_path, temp_dir, db_path, db_username, password):
     if success:
         click.echo(click.style("H2 database cleanup completed successfully!", fg='green', bold=True))
     else:
-        click.echo(click.style("H2 database cleanup failed. Check $HOME/geoweaver/logs for details.", fg='red', bold=True))
+        click.echo(click.style("H2 database cleanup failed. Production DB was left unchanged when possible. Check logs under /tmp/geoweaver_logs or $HOME/geoweaver/logs.", fg='red', bold=True))
 
 
 @geoweaver.command("upgrade")

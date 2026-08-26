@@ -4,6 +4,8 @@ import subprocess
 import sys
 import webbrowser
 import time
+from typing import Optional
+
 import psutil
 import requests
 from halo import Halo
@@ -13,6 +15,7 @@ from pygeoweaver.h2_utils import (
     get_safe_datasource_url_for_start,
     maintain_h2_database_on_stop,
     prepare_h2_database_for_start,
+    warn_oversized_h2_on_lifecycle,
 )
 from pygeoweaver.jdk_utils import check_java
 from pygeoweaver.pgw_log_config import get_logger
@@ -121,12 +124,16 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
             safe_exit(1)
 
 
-def stop_on_windows(compact_h2: bool = True):
+def stop_on_windows(maintain_h2: bool = False, compact_h2: Optional[bool] = None):
+    """Stop Geoweaver on Windows. ``compact_h2`` is a deprecated alias for ``maintain_h2``."""
+    if compact_h2 is not None:
+        maintain_h2 = compact_h2
     print("Stopping Geoweaver...")
     subprocess.run(["taskkill", "/f", "/im", "java.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if compact_h2:
+    warn_oversized_h2_on_lifecycle()
+    if maintain_h2:
         with get_spinner(text="Maintaining H2 database safely...", spinner="dots"):
-            maintain_h2_database_on_stop()
+            maintain_h2_database_on_stop(allow_compact=True)
     print("Geoweaver stopped successfully.")
 
 
@@ -231,7 +238,14 @@ def find_geoweaver_processes(current_uid):
             continue  # Skip processes that have exited or are inaccessible
     return processes
 
-def stop_on_mac_linux(exit_on_finish: bool = False, compact_h2: bool = True) -> int:
+def stop_on_mac_linux(
+    exit_on_finish: bool = False,
+    maintain_h2: bool = False,
+    compact_h2: Optional[bool] = None,
+) -> int:
+    """Stop Geoweaver on macOS/Linux. ``compact_h2`` is a deprecated alias for ``maintain_h2``."""
+    if compact_h2 is not None:
+        maintain_h2 = compact_h2
     with get_spinner(text='Stopping Geoweaver...', spinner='dots'):
         logger.info("Stopping any running Geoweaver processes...")
 
@@ -268,9 +282,10 @@ def stop_on_mac_linux(exit_on_finish: bool = False, compact_h2: bool = True) -> 
 
         _wait_for_geoweaver_shutdown()
 
-        if compact_h2:
+        warn_oversized_h2_on_lifecycle()
+        if maintain_h2:
             with get_spinner(text="Maintaining H2 database safely...", spinner="dots"):
-                maintain_h2_database_on_stop()
+                maintain_h2_database_on_stop(allow_compact=True)
 
         if not processes:
             return 0
@@ -295,7 +310,7 @@ def start(force_download=False, force_restart=False, exit_on_finish=True):
     check_java()
 
     if force_restart:
-        stop(exit_on_finish=False, compact_h2=True)
+        stop(exit_on_finish=False, maintain_h2=False)
     elif check_geoweaver_status():
         print("Geoweaver is already running.")
         if exit_on_finish:
@@ -317,12 +332,21 @@ def start(force_download=False, force_restart=False, exit_on_finish=True):
         start_on_mac_linux(force_restart=force_restart, force_download=force_download, exit_on_finish=exit_on_finish)
 
 
-def stop(exit_on_finish: bool=False, compact_h2: bool=True):
+def stop(exit_on_finish: bool = False, maintain_h2: bool = False, compact_h2: Optional[bool] = None):
+    """
+    Stop Geoweaver.
+
+    By default stop only terminates the JVM and prints an oversized-H2 hint.
+    Pass ``maintain_h2=True`` (or deprecated ``compact_h2=True``) for optional
+    short compact. Full rebuild is ``gw cleanh2db``.
+    """
+    if compact_h2 is not None:
+        maintain_h2 = compact_h2
     check_java()
     if check_os() == 3:
-        stop_on_windows(compact_h2=compact_h2)
+        stop_on_windows(maintain_h2=maintain_h2)
     else:
-        exit_code = stop_on_mac_linux(compact_h2=compact_h2)
+        exit_code = stop_on_mac_linux(maintain_h2=maintain_h2)
         if exit_on_finish:
             safe_exit(exit_code)
 

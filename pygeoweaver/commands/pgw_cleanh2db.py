@@ -45,7 +45,7 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
         with get_spinner(text="Checking if Geoweaver is running...", spinner="dots"):
             if check_geoweaver_status():
                 logger.info("Geoweaver is running, stopping before cleanup")
-                stop(exit_on_finish=False, compact_h2=False)
+                stop(exit_on_finish=False, maintain_h2=False)
 
         resolved_db_path = resolve_h2_db_path(db_path)
         db_username = db_username or GEOWEAVER_DEFAULT_DB_USERNAME

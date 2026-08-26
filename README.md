@@ -47,7 +47,9 @@ PyGeoWeaver provides several commands to interact with GeoWeaver. Below is a lis
 gw start
   ```
 
-- **Stopping GeoWeaver**: Stops the GeoWeaver interface.
+- **Stopping GeoWeaver**: Stops the GeoWeaver interface. By default this only
+  stops the JVM (and prints a hint if the H2 database is oversized). Full H2
+  rebuild remains `gw cleanh2db`; optional short compact: `gw stop --maintain-h2`.
   ```python
   geoweaver.stop()
   ```
@@ -120,23 +122,25 @@ Thank you for choosing PyGeoWeaver! We hope this package enhances your geospatia
 ### cleanh2db
 
 - **Usage**: `gw cleanh2db [OPTIONS]`
-- **Description**: Clean and reduce the size of the H2 database used by Geoweaver.
-  
-  This command follows these steps:
+- **Description**: Clean and reduce the size of the H2 database used by Geoweaver (**fail closed**).
+
+  Safe verify-then-promote pipeline:
   1. Stop Geoweaver if it's running
-  2. Create a temporary directory if one is not provided
-  3. Copy database files to the temporary directory
-  4. Export data from the database to a SQL file
-  5. Remove the original database files
-  6. Import the SQL file into a new database
-  7. Start Geoweaver
+  2. Copy production DB into `~/geoweaver/h2_backups/.../original/`
+  3. Export to SQL and import into a side `rebuilt/` database
+  4. Verify rebuilt DB can open **and** retains WORKFLOW/GWPROCESS/HOST row counts
+  5. Promote rebuilt files into production only after verification
+  6. Start Geoweaver
+
+  Production is **not** deleted before import. On interrupt/failure, production is left
+  unchanged or restored from `original/`. Export/import retries transient lock/timeouts.
 
 - **Options**:
   - `--h2-jar-path PATH`: Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.
-  - `--temp-dir PATH`: Path to a temporary directory for the recovery process. If not provided, will create one.
-  - `--db-path PATH`: Path to the H2 database files. If not provided, will use ~/h2/gw.
-  - `--username TEXT`: Username for the H2 database. Defaults to "geoweaver".
-  - `--password TEXT`: Password for the H2 database. If not provided, will prompt the user.
+  - `--temp-dir PATH`: Work/backup directory (default: `~/geoweaver/h2_backups`). Registered for crash recovery.
+  - `--db-path PATH`: Path to the H2 database files. If not provided, uses `application.properties` or `~/h2/gw`.
+  - `--db-username TEXT`: Username for the H2 database. Defaults to "geoweaver".
+  - `--password TEXT`: Password for the H2 database. Defaults to the built-in Geoweaver H2 password.
   - `--help`: Show this message and exit.
 
 ### create
