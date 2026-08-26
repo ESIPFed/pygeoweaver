@@ -18,10 +18,20 @@ def test_inventory_meets_baseline_rejects_workflow_shrink():
 def test_inventory_meets_baseline_accepts_equal_strict_tables():
     ok, reason = h2_utils.inventory_meets_baseline(
         {"WORKFLOW": 5, "GWPROCESS": 2, "HOST": 1, "HISTORY": 100},
-        {"WORKFLOW": 5, "GWPROCESS": 2, "HOST": 1, "HISTORY": 90},
+        {"WORKFLOW": 5, "GWPROCESS": 2, "HOST": 1, "HISTORY": 100},
     )
     assert ok is True
     assert reason == "ok"
+
+
+def test_inventory_meets_baseline_rejects_history_shrink():
+    """Half-imported SQL often keeps WORKFLOW but loses HISTORY rows — must block promote."""
+    ok, reason = h2_utils.inventory_meets_baseline(
+        {"WORKFLOW": 5, "GWPROCESS": 2, "HOST": 1, "HISTORY": 100},
+        {"WORKFLOW": 5, "GWPROCESS": 2, "HOST": 1, "HISTORY": 50},
+    )
+    assert ok is False
+    assert "HISTORY" in reason
 
 
 def test_production_needs_restore_when_empty_but_backup_has_workflows():
