@@ -34,8 +34,10 @@ from pygeoweaver.commands.pgw_history import get_process_history, get_workflow_h
 from pygeoweaver.commands.pgw_list import list_processes_in_workflow
 from pygeoweaver.commands.pgw_sync import sync, sync_workflow
 from pygeoweaver.commands.pgw_upgrade import upgrade_geoweaver
+from pygeoweaver.commands.pgw_status import show_geoweaver_status
+from pygeoweaver.commands.pgw_cleanh2backups import clean_h2_backups_command
 from pygeoweaver.pgw_log_config import setup_logging
-from pygeoweaver.server import check_geoweaver_status, show
+from pygeoweaver.server import show
 from halo import Halo
 from pygeoweaver.utils import get_spinner
 import tempfile
@@ -509,17 +511,26 @@ def sync_workflow_command(workflow_id: str, sync_to_path: typing.Union[str, os.P
 
 
 @geoweaver.command("status")
-def status():
+@click.option(
+    "--db-path",
+    type=click.Path(),
+    default=None,
+    help="Optional H2 database path override (file prefix without .mv.db).",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Emit machine-readable JSON (credentials still redacted).",
+)
+def status(db_path, as_json):
     """
-    Check the status of Geoweaver.
+    Show Geoweaver runtime, HTTP, Java, config, and H2 database status.
+
+    Passwords, tokens, and embedded JDBC credentials are never printed.
     """
-    with get_spinner(text='Checking Geoweaver status...', spinner='dots'):
-        geoweaver_running = check_geoweaver_status()
-    
-    if geoweaver_running:
-        click.echo(click.style("Geoweaver is running", fg='green', bold=True))
-    else:
-        click.echo(click.style("Geoweaver is not running", fg='red', bold=True))
+    show_geoweaver_status(db_path=db_path, as_json=as_json)
 
 
 @geoweaver.command("cleanh2db")
@@ -561,6 +572,69 @@ def cleanh2db_command(h2_jar_path, temp_dir, db_path, db_username, password):
         click.echo(click.style("H2 database cleanup completed successfully!", fg='green', bold=True))
     else:
         click.echo(click.style("H2 database cleanup failed. Production DB was left unchanged when possible. Check logs under /tmp/geoweaver_logs or $HOME/geoweaver/logs.", fg='red', bold=True))
+
+
+@geoweaver.command("cleanh2backups")
+@click.option(
+    "--list",
+    "list_only",
+    is_flag=True,
+    default=False,
+    help="List backup directories and sizes only (default when no delete options).",
+)
+@click.option(
+    "--keep",
+    type=int,
+    default=None,
+    help="Keep the N newest backups; delete older ones.",
+)
+@click.option(
+    "--all",
+    "remove_all",
+    is_flag=True,
+    default=False,
+    help="Delete all H2 safety backups under the backup root.",
+)
+@click.option(
+    "--path",
+    "paths",
+    multiple=True,
+    type=click.Path(),
+    help="Delete a specific backup directory (repeatable). Must be under the backup root.",
+)
+@click.option(
+    "--backup-root",
+    type=click.Path(),
+    default=None,
+    help="Override backup root (default: ~/geoweaver/h2_backups).",
+)
+@click.option("--dry-run", is_flag=True, default=False, help="Show what would be deleted without removing files.")
+@click.option("-y", "--yes", is_flag=True, default=False, help="Skip confirmation prompt.")
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Also remove backups marked .in_progress (dangerous).",
+)
+def cleanh2backups_command(list_only, keep, remove_all, paths, backup_root, dry_run, yes, force):
+    """
+    List or delete H2 safety backups created by gw cleanh2db.
+
+    Default (no delete flags): list backups with sizes.
+    After verifying workflows/hosts, free disk space with --keep / --path / --all.
+    """
+    if sum(1 for flag in (keep is not None, remove_all, bool(paths)) if flag) > 1:
+        raise click.UsageError("Use only one of --keep, --all, or --path.")
+    clean_h2_backups_command(
+        keep=keep,
+        remove_all=remove_all,
+        paths=list(paths) if paths else None,
+        list_only=list_only,
+        dry_run=dry_run,
+        yes=yes,
+        force=force,
+        backup_root=backup_root,
+    )
 
 
 @geoweaver.command("upgrade")

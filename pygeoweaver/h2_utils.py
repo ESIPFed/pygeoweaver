@@ -938,23 +938,7 @@ def _validate_sql_export(sql_file: str) -> bool:
 
 
 def prune_old_h2_backups() -> None:
-    backup_root = get_h2_backup_base_dir()
-    if not os.path.isdir(backup_root):
-        return
-
-    backups = [
-        os.path.join(backup_root, entry)
-        for entry in os.listdir(backup_root)
-        if os.path.isdir(os.path.join(backup_root, entry))
-    ]
-    backups.sort(key=os.path.getmtime, reverse=True)
-
-    for old_backup in backups[H2_BACKUP_RETENTION_COUNT:]:
-        try:
-            shutil.rmtree(old_backup)
-            logger.info("Removed old H2 backup: %s", old_backup)
-        except Exception as exc:
-            logger.warning("Failed to remove old H2 backup %s: %s", old_backup, exc)
+    cleanup_h2_backups(keep=H2_BACKUP_RETENTION_COUNT, remove_all=False, dry_run=False)
 
 
 def restore_from_latest_backup(db_path: Optional[str] = None) -> bool:
@@ -1032,6 +1016,152 @@ def get_h2_database_size_bytes(db_path: Optional[str] = None) -> int:
     if not os.path.exists(mv_db_path):
         return 0
     return os.path.getsize(mv_db_path)
+
+
+def format_bytes(num_bytes: int) -> str:
+    """Human-readable byte size for CLI output."""
+    if num_bytes <= 0:
+        return "0 B"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(num_bytes)
+    for unit in units:
+        if size < 1024.0 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.2f} {unit}"
+        size /= 1024.0
+    return f"{num_bytes} B"
+
+
+def _directory_size_bytes(path: str) -> int:
+    total = 0
+    if not os.path.isdir(path):
+        return 0
+    for root, _dirs, files in os.walk(path):
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                continue
+    return total
+
+
+def list_h2_backups(backup_root: Optional[str] = None) -> List[Dict[str, object]]:
+    """
+    List timestamped H2 safety-backup directories under the backup root.
+
+    Each entry: path, name, mtime, size_bytes, in_progress.
+    Sorted newest first.
+    """
+    root = backup_root or get_h2_backup_base_dir()
+    if not os.path.isdir(root):
+        return []
+
+    backups: List[Dict[str, object]] = []
+    for entry in os.listdir(root):
+        path = os.path.join(root, entry)
+        if not os.path.isdir(path):
+            continue
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            mtime = 0.0
+        backups.append(
+            {
+                "path": path,
+                "name": entry,
+                "mtime": mtime,
+                "size_bytes": _directory_size_bytes(path),
+                "in_progress": os.path.exists(os.path.join(path, ".in_progress")),
+            }
+        )
+
+    backups.sort(key=lambda item: float(item["mtime"]), reverse=True)
+    return backups
+
+
+def cleanup_h2_backups(
+    keep: Optional[int] = None,
+    remove_all: bool = False,
+    paths: Optional[List[str]] = None,
+    backup_root: Optional[str] = None,
+    dry_run: bool = False,
+    allow_in_progress: bool = False,
+) -> Dict[str, object]:
+    """
+    Remove H2 safety backups under the backup root.
+
+    Precedence:
+    - ``paths``: delete only those directories (must be under backup root)
+    - ``remove_all``: delete every backup directory
+    - ``keep``: keep the N newest; delete the rest (default when keep is None and
+      neither paths nor remove_all: use ``H2_BACKUP_RETENTION_COUNT``)
+
+    Never deletes directories with ``.in_progress`` unless ``allow_in_progress``.
+    """
+    root = os.path.abspath(backup_root or get_h2_backup_base_dir())
+    listed = list_h2_backups(root)
+    to_delete: List[Dict[str, object]] = []
+
+    if paths:
+        abs_paths = {os.path.abspath(os.path.expanduser(p)) for p in paths}
+        for item in listed:
+            if os.path.abspath(str(item["path"])) in abs_paths:
+                to_delete.append(item)
+        missing = abs_paths - {os.path.abspath(str(i["path"])) for i in to_delete}
+        if missing:
+            logger.warning("Requested backup path(s) not found under %s: %s", root, sorted(missing))
+    elif remove_all:
+        to_delete = list(listed)
+    else:
+        retention = H2_BACKUP_RETENTION_COUNT if keep is None else max(0, int(keep))
+        to_delete = list(listed[retention:])
+
+    deleted: List[str] = []
+    skipped: List[str] = []
+    errors: List[str] = []
+
+    for item in to_delete:
+        path = str(item["path"])
+        if item.get("in_progress") and not allow_in_progress:
+            skipped.append(path)
+            logger.warning("Skipping in-progress backup (use --force to remove): %s", path)
+            continue
+        # Safety: only delete directories that live under the backup root
+        try:
+            if os.path.commonpath([root, os.path.abspath(path)]) != root:
+                errors.append(path)
+                logger.error("Refusing to delete path outside backup root: %s", path)
+                continue
+        except ValueError:
+            errors.append(path)
+            logger.error("Refusing to delete path outside backup root: %s", path)
+            continue
+        if dry_run:
+            deleted.append(path)
+            continue
+        try:
+            shutil.rmtree(path)
+            deleted.append(path)
+            logger.info("Removed H2 backup: %s", path)
+        except Exception as exc:
+            errors.append(path)
+            logger.warning("Failed to remove H2 backup %s: %s", path, exc)
+
+    remaining = (
+        list_h2_backups(root)
+        if not dry_run
+        else [i for i in listed if str(i["path"]) not in deleted]
+    )
+
+    return {
+        "backup_root": root,
+        "deleted": deleted,
+        "skipped_in_progress": skipped,
+        "errors": errors,
+        "remaining": remaining,
+        "dry_run": dry_run,
+    }
 
 
 def _append_missing_jdbc_params(url: str, params: Dict[str, str]) -> Tuple[str, bool]:

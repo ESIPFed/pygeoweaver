@@ -58,6 +58,13 @@ gw start
 gw stop
   ```
 
+- **Status / health check**: Show runtime, HTTP, Java, config, and H2 database
+  status. Passwords and JDBC credentials are never printed.
+  ```shell
+gw status
+gw status --json
+  ```
+
 - **Listing Existing Objects**: Lists hosts, processes, and workflows.
   ```python
   geoweaver.list_hosts()
@@ -142,6 +149,28 @@ Thank you for choosing PyGeoWeaver! We hope this package enhances your geospatia
   - `--db-username TEXT`: Username for the H2 database. Defaults to "geoweaver".
   - `--password TEXT`: Password for the H2 database. Defaults to the built-in Geoweaver H2 password.
   - `--help`: Show this message and exit.
+
+  On success the command prints the resulting H2 database size and the safety
+  backup path. After you verify data, free disk with `gw cleanh2backups`.
+
+### cleanh2backups
+
+- **Usage**: `gw cleanh2backups [OPTIONS]`
+- **Description**: List or delete H2 safety backups under `~/geoweaver/h2_backups`
+  (created by `gw cleanh2db`).
+
+  With no delete flags, lists each backup directory and its size.
+  After verifying hosts/workflows/processes, remove old backups to reclaim disk.
+
+- **Options**:
+  - `--list`: List only
+  - `--keep N`: Keep the N newest backups; delete older ones
+  - `--all`: Delete all backups
+  - `--path DIR`: Delete a specific backup directory (repeatable)
+  - `--backup-root PATH`: Override backup root
+  - `--dry-run`: Show what would be deleted
+  - `-y` / `--yes`: Skip confirmation
+  - `--force`: Also remove backups marked `.in_progress`
 
 ### create
 
