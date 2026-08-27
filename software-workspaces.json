@@ -1,0 +1,10 @@
+{
+  "default": "h2-clean-reliability",
+  "workspaces": {
+    "h2-clean-reliability": {
+      "path": "projects/h2-clean-reliability",
+      "product": "pygeoweaver H2 cleanh2db reliability",
+      "created": "2026-08-26"
+    }
+  }
+}

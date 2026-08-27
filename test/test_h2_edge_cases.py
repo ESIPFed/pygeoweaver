@@ -72,7 +72,12 @@ def test_pending_rebuild_triggers_rebuild_even_when_database_is_small(tmp_path, 
 
     with patch.object(h2_utils, "_wait_for_database_unlock", return_value=True):
         with patch.object(h2_utils, "rebuild_h2_database_safely", return_value=(True, "/tmp/backup")) as mock_rebuild:
-            assert h2_utils.run_automatic_h2_maintenance("stop", db_path=db_path) is True
+            assert (
+                h2_utils.run_automatic_h2_maintenance(
+                    "stop", db_path=db_path, allow_size_rebuild=True
+                )
+                is True
+            )
             mock_rebuild.assert_called_once()
 
 
@@ -86,7 +91,12 @@ def test_rebuild_failure_sets_pending_rebuild(tmp_path, monkeypatch):
 
     with patch.object(h2_utils, "_wait_for_database_unlock", return_value=True):
         with patch.object(h2_utils, "rebuild_h2_database_safely", return_value=(False, "/tmp/backup")):
-            assert h2_utils.run_automatic_h2_maintenance("stop", db_path=db_path) is True
+            assert (
+                h2_utils.run_automatic_h2_maintenance(
+                    "stop", db_path=db_path, allow_size_rebuild=True
+                )
+                is True
+            )
 
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["pending_rebuild"] is True
@@ -206,7 +216,7 @@ def test_auth_failure_during_export_leaves_production_unchanged(tmp_path, monkey
     assert (tmp_path / "h2" / "gw.mv.db").exists()
 
 
-def test_compact_auth_failure_sets_pending_rebuild_on_stop(tmp_path, monkeypatch):
+def test_compact_auth_failure_sets_interrupted_on_stop(tmp_path, monkeypatch):
     db_path = _db_layout(tmp_path, size_bytes=200 * 1024 * 1024)
     state_path = _maintenance_state(tmp_path, monkeypatch)
     monkeypatch.setattr(h2_utils, "H2_AUTO_MAINTENANCE", True)
@@ -217,10 +227,15 @@ def test_compact_auth_failure_sets_pending_rebuild_on_stop(tmp_path, monkeypatch
 
     with patch.object(h2_utils, "_wait_for_database_unlock", return_value=True):
         with patch.object(h2_utils, "compact_h2_database", return_value=False):
-            assert h2_utils.run_automatic_h2_maintenance("stop", db_path=db_path) is True
+            assert (
+                h2_utils.run_automatic_h2_maintenance(
+                    "stop", db_path=db_path, allow_compact=True
+                )
+                is True
+            )
 
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    assert state["pending_rebuild"] is True
+    assert state["interrupted_maintenance"] is True
 
 
 def test_consecutive_rebuilds_create_unique_work_dirs(tmp_path, monkeypatch):

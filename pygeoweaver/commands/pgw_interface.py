@@ -15,4 +15,6 @@ from pygeoweaver.commands.pgw_create import *
 from pygeoweaver.commands.pgw_sync import *
 from pygeoweaver.commands.pgw_find import *
 from pygeoweaver.commands.pgw_cleanh2db import *
+from pygeoweaver.commands.pgw_cleanh2backups import clean_h2_backups_command
 from pygeoweaver.commands.pgw_upgrade import *
+from pygeoweaver.commands.pgw_status import show_geoweaver_status, collect_geoweaver_status

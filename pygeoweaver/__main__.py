@@ -34,8 +34,10 @@ from pygeoweaver.commands.pgw_history import get_process_history, get_workflow_h
 from pygeoweaver.commands.pgw_list import list_processes_in_workflow
 from pygeoweaver.commands.pgw_sync import sync, sync_workflow
 from pygeoweaver.commands.pgw_upgrade import upgrade_geoweaver
+from pygeoweaver.commands.pgw_status import show_geoweaver_status
+from pygeoweaver.commands.pgw_cleanh2backups import clean_h2_backups_command
 from pygeoweaver.pgw_log_config import setup_logging
-from pygeoweaver.server import check_geoweaver_status, show
+from pygeoweaver.server import show
 from halo import Halo
 from pygeoweaver.utils import get_spinner
 import tempfile
@@ -64,11 +66,17 @@ def start_command(force_download, force_restart):
 
 
 @geoweaver.command("stop")
-def stop_command():
+@click.option(
+    "--maintain-h2",
+    is_flag=True,
+    default=False,
+    help="After stopping, optionally compact H2 (short timeout). Full rebuild: gw cleanh2db",
+)
+def stop_command(maintain_h2):
     """
-    Start the Geoweaver application.
+    Stop the Geoweaver application.
     """
-    stop(exit_on_finish=True)
+    stop(exit_on_finish=True, maintain_h2=maintain_h2)
 
 @geoweaver.command("show")
 @click.option('--geoweaver-url', default=GEOWEAVER_DEFAULT_ENDPOINT_URL, help='Geoweaver URL (default is GEOWEAVER_DEFAULT_ENDPOINT_URL)')
@@ -503,37 +511,50 @@ def sync_workflow_command(workflow_id: str, sync_to_path: typing.Union[str, os.P
 
 
 @geoweaver.command("status")
-def status():
+@click.option(
+    "--db-path",
+    type=click.Path(),
+    default=None,
+    help="Optional H2 database path override (file prefix without .mv.db).",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Emit machine-readable JSON (credentials still redacted).",
+)
+def status(db_path, as_json):
     """
-    Check the status of Geoweaver.
+    Show Geoweaver runtime, HTTP, Java, config, and H2 database status.
+
+    Passwords, tokens, and embedded JDBC credentials are never printed.
     """
-    with get_spinner(text='Checking Geoweaver status...', spinner='dots'):
-        geoweaver_running = check_geoweaver_status()
-    
-    if geoweaver_running:
-        click.echo(click.style("Geoweaver is running", fg='green', bold=True))
-    else:
-        click.echo(click.style("Geoweaver is not running", fg='red', bold=True))
+    show_geoweaver_status(db_path=db_path, as_json=as_json)
 
 
 @geoweaver.command("cleanh2db")
 @click.option('--h2-jar-path', type=click.Path(exists=True), help='Path to the H2 database JAR file. If not provided, will use h2-2.2.224.jar in the current directory.')
-@click.option('--temp-dir', type=click.Path(), help='Path to a temporary directory for the recovery process. If not provided, will create one.')
-@click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, will use ~/h2/gw.')
+@click.option('--temp-dir', type=click.Path(), help='Work/backup directory for export+rebuild (default: ~/geoweaver/h2_backups). Registered for crash recovery.')
+@click.option('--db-path', type=click.Path(), help='Path to the H2 database files. If not provided, uses application.properties or ~/h2/gw.')
 @click.option('--db-username', help='Username for the H2 database. Defaults to "geoweaver".')
-@click.option('--password', help='Password for the H2 database. Defaults to "DFKHH9V6ME".')
+@click.option('--password', help='Password for the H2 database. Defaults to the built-in Geoweaver H2 password.')
 def cleanh2db_command(h2_jar_path, temp_dir, db_path, db_username, password):
     """
     Clean and reduce the size of the H2 database used by Geoweaver.
 
-    This command follows these steps:
-    1. Stop Geoweaver if it's running
-    2. Create a temporary directory if one is not provided
-    3. Copy database files to the temporary directory
-    4. Export data from the database to a SQL file
-    5. Remove the original database files
-    6. Import the SQL file into a new database
-    7. Start Geoweaver
+    Safe verify-then-promote pipeline (production is not replaced until the
+    rebuilt database passes connectivity and table-inventory checks):
+
+    1. Stop Geoweaver if it is running
+    2. Copy production DB into a timestamped work directory (original/)
+    3. Export data to SQL and import into a side rebuilt/ database
+    4. Verify rebuilt DB (open + WORKFLOW/GWPROCESS/HOST row counts)
+    5. Promote rebuilt files into production only after verification
+    6. Start Geoweaver
+
+    On failure or interrupt before a successful promote, production is left
+    unchanged (or restored from original/). Fail closed — never "always succeed".
     """
     if db_username:
         click.echo(click.style(f"[INFO] Using custom database username: {db_username}", fg='yellow'))
@@ -550,7 +571,70 @@ def cleanh2db_command(h2_jar_path, temp_dir, db_path, db_username, password):
     if success:
         click.echo(click.style("H2 database cleanup completed successfully!", fg='green', bold=True))
     else:
-        click.echo(click.style("H2 database cleanup failed. Check $HOME/geoweaver/logs for details.", fg='red', bold=True))
+        click.echo(click.style("H2 database cleanup failed. Production DB was left unchanged when possible. Check logs under /tmp/geoweaver_logs or $HOME/geoweaver/logs.", fg='red', bold=True))
+
+
+@geoweaver.command("cleanh2backups")
+@click.option(
+    "--list",
+    "list_only",
+    is_flag=True,
+    default=False,
+    help="List backup directories and sizes only (default when no delete options).",
+)
+@click.option(
+    "--keep",
+    type=int,
+    default=None,
+    help="Keep the N newest backups; delete older ones.",
+)
+@click.option(
+    "--all",
+    "remove_all",
+    is_flag=True,
+    default=False,
+    help="Delete all H2 safety backups under the backup root.",
+)
+@click.option(
+    "--path",
+    "paths",
+    multiple=True,
+    type=click.Path(),
+    help="Delete a specific backup directory (repeatable). Must be under the backup root.",
+)
+@click.option(
+    "--backup-root",
+    type=click.Path(),
+    default=None,
+    help="Override backup root (default: ~/geoweaver/h2_backups).",
+)
+@click.option("--dry-run", is_flag=True, default=False, help="Show what would be deleted without removing files.")
+@click.option("-y", "--yes", is_flag=True, default=False, help="Skip confirmation prompt.")
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Also remove backups marked .in_progress (dangerous).",
+)
+def cleanh2backups_command(list_only, keep, remove_all, paths, backup_root, dry_run, yes, force):
+    """
+    List or delete H2 safety backups created by gw cleanh2db.
+
+    Default (no delete flags): list backups with sizes.
+    After verifying workflows/hosts, free disk space with --keep / --path / --all.
+    """
+    if sum(1 for flag in (keep is not None, remove_all, bool(paths)) if flag) > 1:
+        raise click.UsageError("Use only one of --keep, --all, or --path.")
+    clean_h2_backups_command(
+        keep=keep,
+        remove_all=remove_all,
+        paths=list(paths) if paths else None,
+        list_only=list_only,
+        dry_run=dry_run,
+        yes=yes,
+        force=force,
+        backup_root=backup_root,
+    )
 
 
 @geoweaver.command("upgrade")

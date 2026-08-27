@@ -10,7 +10,9 @@ from pygeoweaver.jdk_utils import check_java
 from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_DB_USERNAME, GEOWEAVER_DEFAULT_DB_PASSWORD
 from pygeoweaver.h2_utils import (
+    format_bytes,
     get_h2_backup_base_dir,
+    get_h2_database_size_bytes,
     get_h2_jar_path,
     h2_maintenance_guard,
     rebuild_h2_database_safely,
@@ -45,7 +47,7 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
         with get_spinner(text="Checking if Geoweaver is running...", spinner="dots"):
             if check_geoweaver_status():
                 logger.info("Geoweaver is running, stopping before cleanup")
-                stop(exit_on_finish=False, compact_h2=False)
+                stop(exit_on_finish=False, maintain_h2=False)
 
         resolved_db_path = resolve_h2_db_path(db_path)
         db_username = db_username or GEOWEAVER_DEFAULT_DB_USERNAME
@@ -90,15 +92,34 @@ def clean_h2db(h2_jar_path=None, temp_dir=None, db_path=None, db_username=None, 
         with get_spinner(text="Starting Geoweaver...", spinner="dots"):
             start(exit_on_finish=False)
 
+        size_after = get_h2_database_size_bytes(resolved_db_path)
+        size_before = 0
+        if work_dir:
+            original_prefix = os.path.join(
+                work_dir, "original", os.path.basename(resolved_db_path)
+            )
+            size_before = get_h2_database_size_bytes(original_prefix)
+
         print("\nH2 database cleanup completed successfully!")
+        print(
+            f"H2 database size: {format_bytes(size_after)} "
+            f"({size_after / (1024 * 1024):.2f} MB)"
+            + (
+                f"  (was {format_bytes(size_before)} / "
+                f"{size_before / (1024 * 1024):.2f} MB before cleanup)"
+                if size_before > 0
+                else ""
+            )
+        )
         print(f"Safety backup retained at: {work_dir}")
         print("  original/   untouched copy of the pre-cleanup database")
         print("  displaced/  production files replaced during promotion")
         print("  gw_backup.sql  SQL export used for rebuild")
         print("\nVerify your data with:")
         print("  gw list host")
-        print("Delete the backup only after verification succeeds:")
-        print(f"  rm -rf '{work_dir}'")
+        print("After verification, free disk space with:")
+        print("  gw cleanh2backups --list")
+        print(f"  gw cleanh2backups --path '{work_dir}' -y")
         return True
 
     except Exception as exc:

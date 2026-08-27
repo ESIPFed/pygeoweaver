@@ -110,7 +110,7 @@ def test_stale_maintenance_lock_is_replaced(tmp_path, monkeypatch):
     h2_utils.release_maintenance_lock()
 
 
-def test_maintenance_guard_recovers_on_keyboard_interrupt(tmp_path, monkeypatch):
+def test_maintenance_guard_does_not_recover_on_keyboard_interrupt(tmp_path, monkeypatch):
     _db_layout(tmp_path)
     monkeypatch.setattr(h2_utils, "get_home_dir", lambda: str(tmp_path))
 
@@ -122,11 +122,12 @@ def test_maintenance_guard_recovers_on_keyboard_interrupt(tmp_path, monkeypatch)
         except KeyboardInterrupt:
             pass
 
-    assert mock_recover.call_count >= 2
+    # recover runs once at guard entry, never again on interrupt
+    assert mock_recover.call_count == 1
     assert not os.path.exists(h2_utils._maintenance_lock_path())
 
 
-def test_sigint_marks_pending_rebuild_and_releases_lock(tmp_path, monkeypatch):
+def test_sigint_marks_interrupted_without_pending_rebuild(tmp_path, monkeypatch):
     state_path = _maintenance_state(tmp_path, monkeypatch)
     monkeypatch.setattr(h2_utils, "H2_MAINTENANCE_LOCK_WAIT_STOP_SECONDS", 1)
 
@@ -138,7 +139,7 @@ def test_sigint_marks_pending_rebuild_and_releases_lock(tmp_path, monkeypatch):
             handler = fn
         return fn
 
-    with patch.object(h2_utils, "recover_from_interrupted_maintenance", return_value=True):
+    with patch.object(h2_utils, "recover_from_interrupted_maintenance", return_value=True) as mock_recover:
         with patch.object(h2_utils.signal, "signal", side_effect=capture_signal):
             with patch.object(h2_utils, "acquire_maintenance_lock", return_value=True):
                 with pytest.raises(KeyboardInterrupt):
@@ -147,8 +148,10 @@ def test_sigint_marks_pending_rebuild_and_releases_lock(tmp_path, monkeypatch):
                         handler(__import__("signal").SIGINT, None)
 
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    assert state["pending_rebuild"] is True
     assert state["interrupted_maintenance"] is True
+    assert state.get("pending_rebuild") is not True
+    # recover only at entry, not from signal handler
+    assert mock_recover.call_count == 1
 
 
 def test_impatient_double_stop_skips_second_maintenance(tmp_path, monkeypatch):
@@ -224,7 +227,7 @@ def test_force_restart_stops_before_start():
                                 from pygeoweaver.server import start
 
                                 start(force_restart=True, exit_on_finish=False)
-                                mock_stop.assert_called_once_with(exit_on_finish=False, compact_h2=True)
+                                mock_stop.assert_called_once_with(exit_on_finish=False, maintain_h2=False)
 
 
 def test_start_aborts_when_h2_prepare_fails():
@@ -244,12 +247,32 @@ def test_double_stop_without_running_processes_is_safe():
     with patch("pygeoweaver.server.check_java"):
         with patch("pygeoweaver.server.check_os", return_value=2):
             with patch("pygeoweaver.server.find_geoweaver_processes", return_value=[]):
-                with patch("pygeoweaver.server.maintain_h2_database_on_stop", return_value=True):
-                    with patch("pygeoweaver.server._wait_for_geoweaver_shutdown", return_value=True):
-                        from pygeoweaver.server import stop_on_mac_linux
+                with patch("pygeoweaver.server.warn_oversized_h2_on_lifecycle"):
+                    with patch("pygeoweaver.server.maintain_h2_database_on_stop") as mock_maintain:
+                        with patch("pygeoweaver.server._wait_for_geoweaver_shutdown", return_value=True):
+                            from pygeoweaver.server import stop_on_mac_linux
 
-                        assert stop_on_mac_linux(exit_on_finish=False) == 0
-                        assert stop_on_mac_linux(exit_on_finish=False) == 0
+                            assert stop_on_mac_linux(exit_on_finish=False) == 0
+                            assert stop_on_mac_linux(exit_on_finish=False) == 0
+                            mock_maintain.assert_not_called()
+
+
+def test_default_stop_does_not_rebuild_oversized_db(tmp_path, monkeypatch):
+    db_path, _ = _db_layout(tmp_path, production_data=b"x" * (200 * 1024))
+    # Pretend the file is huge without allocating gigabytes
+    monkeypatch.setattr(h2_utils, "get_home_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(h2_utils, "get_h2_database_size_bytes", lambda _=None: 2 * 1024 * 1024 * 1024)
+    monkeypatch.setattr(h2_utils, "H2_AUTO_MAINTENANCE", True)
+    monkeypatch.setattr(h2_utils, "H2_AUTO_REBUILD_THRESHOLD_MB", 1024)
+    monkeypatch.setattr(h2_utils, "is_geoweaver_process_running", lambda: False)
+    monkeypatch.setattr(h2_utils, "ensure_h2_safe_datasource_url", lambda: False)
+
+    with patch.object(h2_utils, "rebuild_h2_database_safely") as mock_rebuild:
+        with patch.object(h2_utils, "compact_h2_database") as mock_compact:
+            with patch.object(h2_utils, "verify_h2_database", return_value=True):
+                assert h2_utils.run_automatic_h2_maintenance("stop", db_path=db_path) is True
+                mock_rebuild.assert_not_called()
+                mock_compact.assert_not_called()
 
 
 def test_cleanh2db_refuses_when_maintenance_lock_is_busy():
