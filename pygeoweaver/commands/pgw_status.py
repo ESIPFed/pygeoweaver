@@ -14,7 +14,7 @@ import click
 import requests
 
 from pygeoweaver.config_utils import get_database_url_from_properties, read_properties_file
-from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL, GEOWEAVER_PORT
+from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL, GEOWEAVER_MIN_JAVA_MAJOR, GEOWEAVER_PORT
 from pygeoweaver.h2_utils import (
     H2_AUTO_REBUILD_THRESHOLD_MB,
     _geoweaver_properties_path,
@@ -31,6 +31,7 @@ from pygeoweaver.h2_utils import (
 )
 from pygeoweaver.server import check_geoweaver_status, find_geoweaver_processes
 from pygeoweaver.utils import get_home_dir, get_java_bin_path, get_log_file_path
+from pygeoweaver.jdk_utils import get_java_major_version, print_unsupported_java_warning
 from pygeoweaver.version import __version__
 
 # Property keys that must never be printed in clear text.
@@ -127,12 +128,12 @@ def _format_bytes(num_bytes: int) -> str:
     return f"{num_bytes} B"
 
 
-def _java_version() -> Tuple[bool, str]:
+def _java_version() -> Tuple[bool, str, Optional[int], bool]:
     java_bin = get_java_bin_path()
     if not java_bin or (java_bin != "java" and not os.path.exists(java_bin)):
         # get_java_bin_path may return "java" from PATH
         if shutil.which("java") is None and java_bin == "java":
-            return False, "Java not found on PATH"
+            return False, "Java not found on PATH", None, False
     try:
         result = subprocess.run(
             [java_bin if java_bin else "java", "-version"],
@@ -143,9 +144,11 @@ def _java_version() -> Tuple[bool, str]:
         # java -version writes to stderr
         output = (result.stderr or result.stdout or "").strip().splitlines()
         line = output[0] if output else "java present (version unknown)"
-        return True, line
+        major = get_java_major_version(java_bin if java_bin else "java")
+        meets_min = major is not None and major >= GEOWEAVER_MIN_JAVA_MAJOR
+        return True, line, major, meets_min
     except Exception as exc:
-        return False, f"Unable to run java: {exc}"
+        return False, f"Unable to run java: {exc}", None, False
 
 
 def _http_endpoint_status() -> Dict[str, Any]:
@@ -284,7 +287,7 @@ def collect_geoweaver_status(db_path: Optional[str] = None) -> Dict[str, Any]:
     jar_path = os.path.join(home, "geoweaver.jar")
     props_path = _geoweaver_properties_path()
     log_path = get_log_file_path()
-    java_ok, java_msg = _java_version()
+    java_ok, java_msg, java_major, java_meets_min = _java_version()
     h2_jar = get_h2_jar_path()
 
     properties = read_properties_file(props_path) if os.path.exists(props_path) else {}
@@ -294,7 +297,13 @@ def collect_geoweaver_status(db_path: Optional[str] = None) -> Dict[str, Any]:
         "pygeoweaver_version": __version__,
         "endpoint": _http_endpoint_status(),
         "process": _process_info(),
-        "java": {"available": java_ok, "detail": java_msg},
+        "java": {
+            "available": java_ok,
+            "detail": java_msg,
+            "major": java_major,
+            "meets_min_version": java_meets_min,
+            "min_required_major": GEOWEAVER_MIN_JAVA_MAJOR,
+        },
         "geoweaver_jar": {
             "path": jar_path,
             "exists": os.path.exists(jar_path),
@@ -369,6 +378,16 @@ def print_status_report(report: Dict[str, Any]) -> None:
         ("  Java: " + click.style("OK", fg="green") if java["available"] else "  Java: " + click.style("MISSING", fg="red"))
         + f" — {java['detail']}"
     )
+    if java.get("available") and java.get("meets_min_version") is False:
+        click.echo(
+            click.style(
+                f"  WARNING: Java {java.get('major')} < required {java.get('min_required_major')}. "
+                "Latest Geoweaver no longer supports JDK < 17; use Geoweaver 2.1.x or upgrade Java.",
+                fg="yellow",
+                bold=True,
+            )
+        )
+        print_unsupported_java_warning(java.get("major"))
     jar = report["geoweaver_jar"]
     click.echo(
         f"  geoweaver.jar: {'present' if jar['exists'] else 'MISSING'} ({jar['path']}, {jar['size_human']})"

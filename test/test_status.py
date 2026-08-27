@@ -77,7 +77,13 @@ def test_status_cli_json(monkeypatch):
             "database": {"path": "/tmp/gw", "exists": False},
             "process": {"running": False, "pids": []},
             "endpoint": {"url": "http://localhost:8070/Geoweaver", "reachable": False},
-            "java": {"available": True, "detail": "openjdk"},
+            "java": {
+                "available": True,
+                "detail": "openjdk",
+                "major": 17,
+                "meets_min_version": True,
+                "min_required_major": 17,
+            },
             "geoweaver_jar": {"path": "/tmp/geoweaver.jar", "exists": False, "size_human": "n/a"},
             "h2_tool_jar": {"path": None, "exists": False},
             "config": {

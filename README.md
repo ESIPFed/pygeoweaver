@@ -13,7 +13,14 @@ PyGeoWeaver is a Python package that provides a convenient and user-friendly int
 
 ## Installation
 
-To install PyGeoWeaver, ensure you have Python 3.7 or later installed. You can then install PyGeoWeaver using pip:
+To install PyGeoWeaver, ensure you have **Python 3.7+** and **Java 17+** installed.
+Latest Geoweaver (2.2+ / Spring Boot 3) **no longer supports JDK &lt; 17**.
+
+If you cannot upgrade Java, stay on **Geoweaver 2.1.x** (Java 11):
+[Releases](https://github.com/ESIPFed/Geoweaver/releases)
+(example: [v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar)).
+
+You can then install PyGeoWeaver using pip:
 
 ```bash
 pip install pygeoweaver

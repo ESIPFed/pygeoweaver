@@ -8,3 +8,11 @@ GEOWEAVER_URL = (
 )
 GEOWEAVER_DEFAULT_DB_USERNAME = "geoweaver"
 GEOWEAVER_DEFAULT_DB_PASSWORD = "DFKHH9V6ME"
+
+# Latest Geoweaver (2.2+ / Spring Boot 3) requires Java 17+.
+GEOWEAVER_MIN_JAVA_MAJOR = 17
+GEOWEAVER_LEGACY_JAVA11_LINE = "Geoweaver 2.1.x"
+GEOWEAVER_RELEASES_URL = "https://github.com/ESIPFed/Geoweaver/releases"
+GEOWEAVER_LEGACY_JAR_URL = (
+    "https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar"
+)

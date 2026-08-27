@@ -36,8 +36,37 @@ else
     source "$RC_FILE"
 fi
 
+JAVA_BIN="java"
+if [ -x "$HOME/jdk/jdk-17.0.13+11/bin/java" ]; then
+    JAVA_BIN="$HOME/jdk/jdk-17.0.13+11/bin/java"
+elif [ -x "$HOME/jdk/jdk-11.0.18+10/bin/java" ]; then
+    JAVA_BIN="$HOME/jdk/jdk-11.0.18+10/bin/java"
+fi
+
+JAVA_MAJOR=$("$JAVA_BIN" -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)
+if [ -z "$JAVA_MAJOR" ]; then
+    # Legacy 1.8 style
+    JAVA_MAJOR=$("$JAVA_BIN" -version 2>&1 | sed -n 's/.*version "1\.\([0-9]*\).*/\1/p' | head -1)
+fi
+
+if [ -n "$JAVA_MAJOR" ] && [ "$JAVA_MAJOR" -lt 17 ]; then
+    echo "========================================================================"
+    echo "  Geoweaver WARNING: Unsupported Java version"
+    echo "========================================================================"
+    echo "  Detected Java major version: $JAVA_MAJOR"
+    echo "  Latest Geoweaver (2.2+ / Spring Boot 3) requires Java 17 or newer."
+    echo "  JDK versions older than 17 are no longer supported."
+    echo
+    echo "  If you cannot bump your JDK, use an older Geoweaver release instead:"
+    echo "    - Stay on Geoweaver 2.1.x (Java 11 compatible)"
+    echo "    - Releases: https://github.com/ESIPFed/Geoweaver/releases"
+    echo "    - Example jar: https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar"
+    echo "========================================================================"
+    exit 1
+fi
+
 echo "Start Geoweaver.."
-nohup ~/jdk/jdk-11.0.18+10/bin/java -jar ~/geoweaver.jar > ~/geoweaver.log &
+nohup "$JAVA_BIN" -jar ~/geoweaver.jar > ~/geoweaver.log &
 
 STATUS=0
 counter=0

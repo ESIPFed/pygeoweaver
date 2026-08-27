@@ -139,10 +139,14 @@ def stop_on_windows(maintain_h2: bool = False, compact_h2: Optional[bool] = None
 
 def check_java_exists():
     with get_spinner(text=f'Check if Java is installed...', spinner='dots'):
-        specified_path = os.path.expanduser("~/jdk/jdk-11.0.18+10/bin/java")
-        if os.path.isfile(specified_path):
-            print(f"Using Java in home directory: {specified_path}")
-            return specified_path
+        # Prefer auto-installed Temurin 17 home layout used by pygeoweaver.
+        for candidate in (
+            os.path.expanduser("~/jdk/jdk-17.0.13+11/bin/java"),
+            os.path.expanduser("~/jdk/jdk-11.0.18+10/bin/java"),  # legacy layout
+        ):
+            if os.path.isfile(candidate):
+                print(f"Using Java in home directory: {candidate}")
+                return candidate
 
         # Check if default Java exists
         try:

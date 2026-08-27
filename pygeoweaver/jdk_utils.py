@@ -10,33 +10,98 @@ import urllib.request
 import click
 
 from pygeoweaver.utils import detect_rc_file, get_home_dir, get_java_bin_path, safe_exit
+from pygeoweaver.constants import (
+    GEOWEAVER_LEGACY_JAR_URL,
+    GEOWEAVER_LEGACY_JAVA11_LINE,
+    GEOWEAVER_MIN_JAVA_MAJOR,
+    GEOWEAVER_RELEASES_URL,
+)
+
+# Temurin 17 LTS used when pygeoweaver auto-installs a JDK.
+_DEFAULT_JDK17_VERSION = "17.0.13-11"
+
+
+def print_unsupported_java_warning(detected_major=None):
+    """Warn that latest Geoweaver no longer supports JDK < 17."""
+    major_txt = str(detected_major) if detected_major is not None else "unknown (<17)"
+    click.echo()
+    click.echo(click.style("=" * 72, fg="yellow", bold=True))
+    click.echo(click.style("  Geoweaver WARNING: Unsupported Java version", fg="yellow", bold=True))
+    click.echo(click.style("=" * 72, fg="yellow", bold=True))
+    click.echo(f"  Detected Java major version: {major_txt}")
+    click.echo(
+        f"  Latest Geoweaver (2.2+ / Spring Boot 3) requires Java {GEOWEAVER_MIN_JAVA_MAJOR}+."
+    )
+    click.echo(f"  JDK versions older than {GEOWEAVER_MIN_JAVA_MAJOR} are no longer supported.")
+    click.echo()
+    click.echo("  If you cannot bump your JDK, use an older Geoweaver release instead:")
+    click.echo(f"    - Stay on {GEOWEAVER_LEGACY_JAVA11_LINE} (Java 11 compatible)")
+    click.echo(f"    - Releases: {GEOWEAVER_RELEASES_URL}")
+    click.echo(f"    - Example jar: {GEOWEAVER_LEGACY_JAR_URL}")
+    click.echo()
+    click.echo("  With PyGeoWeaver: download that legacy jar to ~/geoweaver.jar,")
+    click.echo("  or pin an older Geoweaver/pygeoweaver stack that still targets Java 11.")
+    click.echo(click.style("=" * 72, fg="yellow", bold=True))
+    click.echo()
+
+
+def get_java_major_version(java_bin=None):
+    """
+    Return the major Java version as int, or None if it cannot be determined.
+    Parses ``java -version`` output (written to stderr).
+    """
+    java_bin = java_bin or get_java_bin_path()
+    try:
+        result = subprocess.run(
+            [java_bin, "-version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+        )
+        blob = (result.stderr or "") + "\n" + (result.stdout or "")
+        # Examples: 'openjdk version "17.0.13"' / 'java version "1.8.0_392"'
+        import re
+
+        match = re.search(r'version\s+"([^"]+)"', blob)
+        if not match:
+            return None
+        ver = match.group(1)
+        if ver.startswith("1."):
+            # 1.8.0_xxx -> major 8
+            parts = ver.split(".")
+            return int(parts[1]) if len(parts) > 1 else None
+        return int(ver.split(".")[0])
+    except Exception:
+        return None
 
 
 def install_jdk():
     system = platform.system()
     architecture = platform.machine()
+    jdk_version = _DEFAULT_JDK17_VERSION
 
     if system == "Darwin":
         if architecture == "x86_64":
-            install_jdk_macos("11.0.18-10", "jdk_x64_mac_hotspot")
+            install_jdk_macos(jdk_version, "jdk_x64_mac_hotspot")
         elif architecture == "arm64":
-            install_jdk_macos("11.0.18-10", "jdk_aarch64_mac_hotspot")
+            install_jdk_macos(jdk_version, "jdk_aarch64_mac_hotspot")
         else:
             print("Unsupported architecture.")
 
     elif system == "Linux":
         if architecture == "x86_64":
-            install_jdk_linux("11.0.18-10", "jdk_x64_linux_hotspot")
+            install_jdk_linux(jdk_version, "jdk_x64_linux_hotspot")
         elif architecture == "aarch64":
-            install_jdk_linux("11.0.18-10", "jdk_aarch64_linux_hotspot")
+            install_jdk_linux(jdk_version, "jdk_aarch64_linux_hotspot")
         else:
             print("Unsupported architecture.")
 
     elif system == "Windows":
         if architecture == "AMD64" or architecture == "x86_64":
-            install_jdk_windows("11.0.18-10", "jdk_x64_windows_hotspot")
+            install_jdk_windows(jdk_version, "jdk_x64_windows_hotspot")
         elif architecture == "x86-32":
-            install_jdk_windows("11.0.18-10", "jdk_x86-32_windows_hotspot")
+            install_jdk_windows(jdk_version, "jdk_x86-32_windows_hotspot")
         else:
             print("Unsupported architecture.")
 
@@ -45,8 +110,11 @@ def install_jdk():
 
 
 def install_jdk_macos(jdk_version, jdk_arch):
-    # jdk_aarch64_linux_hotspot
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version.replace("-", "%2B")}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
+    jdk_url = (
+        f"https://github.com/adoptium/temurin17-binaries/releases/download/"
+        f"jdk-{jdk_version.replace('-', '%2B')}/"
+        f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.tar.gz"
+    )
     jdk_install_dir = os.path.expanduser("~/jdk")
 
     # Download JDK archive
@@ -60,7 +128,11 @@ def install_jdk_macos(jdk_version, jdk_arch):
 
 
 def install_jdk_linux(jdk_version, jdk_arch):
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version.replace("-", "%2B")}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.tar.gz'
+    jdk_url = (
+        f"https://github.com/adoptium/temurin17-binaries/releases/download/"
+        f"jdk-{jdk_version.replace('-', '%2B')}/"
+        f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.tar.gz"
+    )
     jdk_install_dir = os.path.expanduser("~/jdk")
 
     # Download JDK archive
@@ -74,7 +146,11 @@ def install_jdk_linux(jdk_version, jdk_arch):
 
 
 def install_jdk_windows(jdk_version, jdk_arch):
-    jdk_url = f'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-{jdk_version.replace("-", "%2B")}/OpenJDK11U-{jdk_arch}_{jdk_version.replace("-", "_")}.zip'
+    jdk_url = (
+        f"https://github.com/adoptium/temurin17-binaries/releases/download/"
+        f"jdk-{jdk_version.replace('-', '%2B')}/"
+        f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.zip"
+    )
     jdk_install_dir = os.path.expanduser("~/jdk")
 
     # Download JDK archive
@@ -228,20 +304,76 @@ def is_java_installed():
 
 
 def check_java():
-    # Check if Java is installed
+    """
+    Ensure a usable Java binary exists and meets Geoweaver's minimum major version.
+
+    Latest Geoweaver requires Java 17+. Older JDKs get a clear warning and exit;
+    users who cannot upgrade should use Geoweaver 2.1.x instead.
+    """
     if not is_java_installed():
-        click.echo(click.style("Java is not installed. Installing...", fg="yellow"))
+        click.echo(click.style("Java is not installed. Installing OpenJDK 17...", fg="yellow"))
         try:
             install_jdk()
             if is_java_installed():
                 click.echo(click.style("Java installation complete.", fg="green"))
             else:
-                click.echo(click.style("Java is still not installed correctly. Please follow the instructions below.", fg="red"))
-                click.echo(click.style("Step 1: Visit https://adoptium.net/ to download and install OpenJDK (Eclipse Adoptium).", fg="blue"))
-                click.echo(click.style("Step 2: Choose the appropriate JDK version for your operating system.", fg="blue"))
-                click.echo(click.style("Step 3: Follow the installation instructions provided on the website.", fg="blue"))
-                click.echo(click.style("Step 4: After installation, make sure JAVA_HOME and PATH are set correctly.", fg="blue"))
-                click.echo(click.style("If you encounter any problems, please contact support at geoweaver.app@gmail.com or post in GitHub issues: https://github.com/ESIPFed/pygeoweaver/issues.", fg="red"))
+                click.echo(
+                    click.style(
+                        "Java is still not installed correctly. Please follow the instructions below.",
+                        fg="red",
+                    )
+                )
+                click.echo(
+                    click.style(
+                        "Step 1: Visit https://adoptium.net/ to download and install OpenJDK 17+ (Eclipse Adoptium).",
+                        fg="blue",
+                    )
+                )
+                click.echo(
+                    click.style(
+                        "Step 2: Choose the appropriate JDK version for your operating system.",
+                        fg="blue",
+                    )
+                )
+                click.echo(
+                    click.style(
+                        "Step 3: Follow the installation instructions provided on the website.",
+                        fg="blue",
+                    )
+                )
+                click.echo(
+                    click.style(
+                        "Step 4: After installation, make sure JAVA_HOME and PATH are set correctly.",
+                        fg="blue",
+                    )
+                )
+                click.echo(
+                    click.style(
+                        "If you encounter any problems, please contact support at geoweaver.app@gmail.com or post in GitHub issues: https://github.com/ESIPFed/pygeoweaver/issues.",
+                        fg="red",
+                    )
+                )
+                safe_exit(1)
         except Exception as e:
             click.echo(click.style(f"Error: {e}", fg="red"))
-            click.echo(click.style("Please contact support at support@example.com for further assistance.", fg="red"))
+            click.echo(
+                click.style(
+                    "Please contact support at geoweaver.app@gmail.com for further assistance.",
+                    fg="red",
+                )
+            )
+            safe_exit(1)
+
+    major = get_java_major_version()
+    if major is None:
+        click.echo(
+            click.style(
+                "Warning: could not parse Java version; continuing, but Geoweaver needs Java 17+.",
+                fg="yellow",
+            )
+        )
+        return
+
+    if major < GEOWEAVER_MIN_JAVA_MAJOR:
+        print_unsupported_java_warning(major)
+        safe_exit(1)
