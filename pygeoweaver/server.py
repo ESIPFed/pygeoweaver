@@ -71,6 +71,55 @@ def check_geoweaver_status() -> bool:
         raise ValueError(err_msg)
 
 
+
+def _print_geoweaver_startup_log(max_lines: int = 80) -> None:
+    """Print the end of the Geoweaver process log to aid CI/local diagnosis."""
+    candidates = [
+        os.path.expanduser("~/geoweaver.log"),
+        get_log_file_path(),
+    ]
+    for log_path in candidates:
+        if not log_path or not os.path.exists(log_path):
+            continue
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as handle:
+                lines = handle.readlines()
+            if not lines:
+                print(f"(Geoweaver log empty: {log_path})")
+                return
+            print(f"----- Geoweaver log ({log_path}, last {min(max_lines, len(lines))} lines) -----")
+            for line in lines[-max_lines:]:
+                print(line.rstrip())
+            print("----- end Geoweaver log -----")
+            return
+        except OSError as exc:
+            print(f"Unable to read Geoweaver log {log_path}: {exc}")
+    print("No Geoweaver startup log found under ~/geoweaver.log")
+
+
+def _wait_for_geoweaver_http(max_attempts: int = 45, retry_delay: float = 2.0) -> bool:
+    """
+    Poll the default Geoweaver HTTP endpoint until it responds.
+
+    Returns True when status is 200/302/303. Default wait is ~90 seconds for
+    cold Spring Boot starts on CI.
+    """
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.get(
+                GEOWEAVER_DEFAULT_ENDPOINT_URL,
+                allow_redirects=False,
+                timeout=5,
+            )
+            logger.debug("Startup probe attempt %s: HTTP %s", attempt, response.status_code)
+            if response.status_code in (200, 302, 303):
+                return True
+        except requests.exceptions.RequestException as exc:
+            logger.debug("Startup probe attempt %s failed: %s", attempt, type(exc).__name__)
+        time.sleep(retry_delay)
+    return False
+
+
 def start_on_windows(force_restart=False, force_download=False, exit_on_finish=True):
     
     with get_spinner(text=f'Stop running Geoweaver if any...', spinner='dots'):
@@ -98,28 +147,18 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
         print(f'"{java_cmd}" -jar "{geoweaver_jar}"')
         subprocess.Popen(start_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
-        status = 0
-        counter = 0
-        max_attempts = 20
-        retry_delay = 2
-        while counter < max_attempts:
-            time.sleep(retry_delay)
-            counter += 1
-            try:
-                response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL, allow_redirects=False)
-                if response.status_code == 302:
-                    log_file = get_log_file_path()
-                    # Now you can safely open the log file for reading
-                    with open(log_file, "r") as f:
-                        print(f.read())
-                    print("Success: Geoweaver is up")
-                    if exit_on_finish:
-                        safe_exit(0)
-            except Exception as e:
-                # print(f"Error occurred during request: {e}")
-                continue
+        if _wait_for_geoweaver_http():
+            log_file = get_log_file_path()
+            if log_file and os.path.exists(log_file):
+                with open(log_file, "r") as f:
+                    print(f.read())
+            print("Success: Geoweaver is up")
+            if exit_on_finish:
+                safe_exit(0)
+            return
 
         print("Error: Geoweaver is not up")
+        _print_geoweaver_startup_log()
         if exit_on_finish:
             safe_exit(1)
 
@@ -163,44 +202,34 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
         print("Java not found. Exiting...")
         if exit_on_finish:
             safe_exit(1)
+        return
 
     with get_spinner(text=f'Starting Geoweaver...', spinner='dots'):
         # Start Geoweaver
+        log_path = os.path.expanduser("~/geoweaver.log")
         cmds = [java_path, "-jar", os.path.expanduser("~/geoweaver.jar")]
         datasource_url = get_safe_datasource_url_for_start()
         if datasource_url:
             cmds.append(f"--spring.datasource.url={datasource_url}")
         logger.info("Running %s", " ".join(cmds))
-        with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
+        with open(log_path, 'w') as log_file:
             subprocess.Popen(cmds, 
                             stdout=log_file, 
                             stderr=subprocess.STDOUT)
 
-        # Wait for Geoweaver to start
-        time.sleep(2)  # Adjust as necessary
+        # Brief pause so the JVM can open the log before probes start
+        time.sleep(2)
 
-        status = 0
-        counter = 0
-        max_counter = 10
-        while counter != max_counter:  # max wait for 20 seconds
-            try:
-                status = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL).status_code
-                logger.debug(f"Received code {status}")
-                if status == 302 or status == 200:
-                    break
-            except requests.exceptions.ConnectionError:
-                pass  # Connection error, retrying
-            time.sleep(2)
-            counter += 1
-
-        if counter == max_counter:
-            print("Error: Geoweaver is not up")
-            if exit_on_finish:
-                safe_exit(1)
-        else:
+        if _wait_for_geoweaver_http():
             print("Success: Geoweaver is up")
             if exit_on_finish:
                 safe_exit(0)
+            return
+
+        print("Error: Geoweaver is not up")
+        _print_geoweaver_startup_log()
+        if exit_on_finish:
+            safe_exit(1)
 
 
 def _wait_for_geoweaver_shutdown(timeout_seconds: int = 30) -> bool:
