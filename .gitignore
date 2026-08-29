@@ -14,3 +14,4 @@ pygeoweaver/__pycache__/utils.cpython-39.pyc
 *.pyc
 .DS_Store
 nohup.out
+.DS_Store

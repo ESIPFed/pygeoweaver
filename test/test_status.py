@@ -77,8 +77,20 @@ def test_status_cli_json(monkeypatch):
             "database": {"path": "/tmp/gw", "exists": False},
             "process": {"running": False, "pids": []},
             "endpoint": {"url": "http://localhost:8070/Geoweaver", "reachable": False},
-            "java": {"available": True, "detail": "openjdk"},
-            "geoweaver_jar": {"path": "/tmp/geoweaver.jar", "exists": False, "size_human": "n/a"},
+            "java": {
+                "available": True,
+                "detail": "openjdk",
+                "major": 17,
+                "meets_min_version": True,
+                "min_required_major": 17,
+            },
+            "geoweaver_jar": {
+                "path": "/tmp/geoweaver.jar",
+                "exists": False,
+                "size_human": "n/a",
+                "version": None,
+                "channel": None,
+            },
             "h2_tool_jar": {"path": None, "exists": False},
             "config": {
                 "properties_path": "/tmp/p",
@@ -102,3 +114,68 @@ def test_status_cli_json(monkeypatch):
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["credentials_redacted"] is True
+
+
+def test_get_geoweaver_jar_version_from_manifest(tmp_path):
+    import zipfile
+
+    from pygeoweaver.constants import GEOWEAVER_JAR_CHANNEL_LATEST, GEOWEAVER_JAR_CHANNEL_LEGACY
+    from pygeoweaver.utils import (
+        get_geoweaver_jar_version,
+        infer_geoweaver_jar_channel,
+        resolve_geoweaver_jar_channel,
+    )
+
+    jar = tmp_path / "geoweaver.jar"
+    with zipfile.ZipFile(jar, "w") as zf:
+        zf.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\n"
+            "Implementation-Title: geoweaver\n"
+            "Implementation-Version: 2.1.1\n"
+            "Main-Class: org.springframework.boot.loader.JarLauncher\n",
+        )
+
+    assert get_geoweaver_jar_version(str(jar)) == "2.1.1"
+    assert infer_geoweaver_jar_channel("2.1.1") == GEOWEAVER_JAR_CHANNEL_LEGACY
+    assert infer_geoweaver_jar_channel("2.2.0") == GEOWEAVER_JAR_CHANNEL_LATEST
+    assert infer_geoweaver_jar_channel("2.2.0-SNAPSHOT") == GEOWEAVER_JAR_CHANNEL_LATEST
+    # Jar version wins over a stale home-dir channel marker (CI often has one).
+    with patch(
+        "pygeoweaver.utils.read_geoweaver_jar_channel",
+        return_value=GEOWEAVER_JAR_CHANNEL_LATEST,
+    ):
+        assert resolve_geoweaver_jar_channel(str(jar)) == GEOWEAVER_JAR_CHANNEL_LEGACY
+
+
+def test_resolve_channel_falls_back_to_marker_without_version(tmp_path):
+    import zipfile
+
+    from pygeoweaver.constants import GEOWEAVER_JAR_CHANNEL_LEGACY
+    from pygeoweaver.utils import resolve_geoweaver_jar_channel
+
+    jar = tmp_path / "geoweaver.jar"
+    with zipfile.ZipFile(jar, "w") as zf:
+        zf.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n")
+
+    with patch(
+        "pygeoweaver.utils.read_geoweaver_jar_channel",
+        return_value=GEOWEAVER_JAR_CHANNEL_LEGACY,
+    ):
+        assert resolve_geoweaver_jar_channel(str(jar)) == GEOWEAVER_JAR_CHANNEL_LEGACY
+
+
+def test_get_geoweaver_jar_version_from_build_info(tmp_path):
+    import zipfile
+
+    from pygeoweaver.utils import get_geoweaver_jar_version
+
+    jar = tmp_path / "geoweaver.jar"
+    with zipfile.ZipFile(jar, "w") as zf:
+        zf.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n")
+        zf.writestr(
+            "META-INF/build-info.properties",
+            "build.artifact=geoweaver\nbuild.version=2.2.0\n",
+        )
+
+    assert get_geoweaver_jar_version(str(jar)) == "2.2.0"
