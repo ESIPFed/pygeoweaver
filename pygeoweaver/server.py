@@ -92,11 +92,14 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
 
     with get_spinner(text=f'Starting Geowaever...', spinner='dots'):
         geoweaver_jar = os.path.join(home_dir, "geoweaver.jar")
-        start_cmd = [java_cmd, "-jar", geoweaver_jar]
+        # Pass datasource as a JVM system property — Geoweaver's picocli CLI
+        # rejects Spring Boot `--spring.*` program arguments and exits.
+        start_cmd = [java_cmd]
         datasource_url = get_safe_datasource_url_for_start()
         if datasource_url:
-            start_cmd.append(f"--spring.datasource.url={datasource_url}")
-        print(f'"{java_cmd}" -jar "{geoweaver_jar}"')
+            start_cmd.append(f"-Dspring.datasource.url={datasource_url}")
+        start_cmd.extend(["-jar", geoweaver_jar])
+        print(" ".join(start_cmd))
         subprocess.Popen(start_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
         status = 0
@@ -175,11 +178,13 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
             safe_exit(1)
 
     with get_spinner(text=f'Starting Geoweaver...', spinner='dots'):
-        # Start Geoweaver
-        cmds = [java_path, "-jar", os.path.expanduser("~/geoweaver.jar")]
+        # Pass datasource as a JVM system property — Geoweaver's picocli CLI
+        # rejects Spring Boot `--spring.*` program arguments and exits.
+        cmds = [java_path]
         datasource_url = get_safe_datasource_url_for_start()
         if datasource_url:
-            cmds.append(f"--spring.datasource.url={datasource_url}")
+            cmds.append(f"-Dspring.datasource.url={datasource_url}")
+        cmds.extend(["-jar", os.path.expanduser("~/geoweaver.jar")])
         logger.info("Running %s", " ".join(cmds))
         with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
             subprocess.Popen(cmds, 
