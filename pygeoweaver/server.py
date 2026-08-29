@@ -101,7 +101,7 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
 
         status = 0
         counter = 0
-        max_attempts = 20
+        max_attempts = 45
         retry_delay = 2
         while counter < max_attempts:
             time.sleep(retry_delay)
@@ -186,25 +186,33 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
                             stdout=log_file, 
                             stderr=subprocess.STDOUT)
 
-        # Wait for Geoweaver to start
-        time.sleep(2)  # Adjust as necessary
+        # Wait for Geoweaver to start (Boot 3 / large jar needs more than ~20s on CI)
+        time.sleep(2)
 
         status = 0
         counter = 0
-        max_counter = 10
-        while counter != max_counter:  # max wait for 20 seconds
+        max_counter = 45  # ~90s plus initial sleep
+        while counter != max_counter:  # max wait for cold start
             try:
-                status = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL).status_code
+                status = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL, allow_redirects=False, timeout=5).status_code
                 logger.debug(f"Received code {status}")
                 if status == 302 or status == 200:
                     break
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.RequestException:
                 pass  # Connection error, retrying
             time.sleep(2)
             counter += 1
 
         if counter == max_counter:
             print("Error: Geoweaver is not up")
+            log_path = os.path.expanduser("~/geoweaver.log")
+            if os.path.isfile(log_path):
+                try:
+                    with open(log_path, "r", errors="replace") as f:
+                        print("===== ~/geoweaver.log (tail) =====")
+                        print("".join(f.readlines()[-80:]))
+                except OSError:
+                    pass
             if exit_on_finish:
                 safe_exit(1)
         else:
