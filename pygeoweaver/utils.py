@@ -315,11 +315,18 @@ def infer_geoweaver_jar_channel(version=None, jar_path=None):
 
 
 def resolve_geoweaver_jar_channel(jar_path=None):
-    """Return marker channel, else infer from jar version, else None."""
-    channel = read_geoweaver_jar_channel()
-    if channel:
-        return channel
-    return infer_geoweaver_jar_channel(jar_path=jar_path)
+    """
+    Resolve jar channel for status / download decisions.
+
+    Prefer the version embedded in the JAR (source of truth for what is
+    installed). Fall back to ``~/geoweaver.jar.channel`` only when the
+    version cannot be read — so a stale global marker cannot override a
+    specifically inspected jar (e.g. unit tests or a manually replaced jar).
+    """
+    inferred = infer_geoweaver_jar_channel(jar_path=jar_path)
+    if inferred:
+        return inferred
+    return read_geoweaver_jar_channel()
 
 
 def check_geoweaver_jar():

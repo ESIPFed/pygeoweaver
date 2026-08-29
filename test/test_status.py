@@ -140,7 +140,29 @@ def test_get_geoweaver_jar_version_from_manifest(tmp_path):
     assert infer_geoweaver_jar_channel("2.1.1") == GEOWEAVER_JAR_CHANNEL_LEGACY
     assert infer_geoweaver_jar_channel("2.2.0") == GEOWEAVER_JAR_CHANNEL_LATEST
     assert infer_geoweaver_jar_channel("2.2.0-SNAPSHOT") == GEOWEAVER_JAR_CHANNEL_LATEST
-    assert resolve_geoweaver_jar_channel(str(jar)) == GEOWEAVER_JAR_CHANNEL_LEGACY
+    # Jar version wins over a stale home-dir channel marker (CI often has one).
+    with patch(
+        "pygeoweaver.utils.read_geoweaver_jar_channel",
+        return_value=GEOWEAVER_JAR_CHANNEL_LATEST,
+    ):
+        assert resolve_geoweaver_jar_channel(str(jar)) == GEOWEAVER_JAR_CHANNEL_LEGACY
+
+
+def test_resolve_channel_falls_back_to_marker_without_version(tmp_path):
+    import zipfile
+
+    from pygeoweaver.constants import GEOWEAVER_JAR_CHANNEL_LEGACY
+    from pygeoweaver.utils import resolve_geoweaver_jar_channel
+
+    jar = tmp_path / "geoweaver.jar"
+    with zipfile.ZipFile(jar, "w") as zf:
+        zf.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n")
+
+    with patch(
+        "pygeoweaver.utils.read_geoweaver_jar_channel",
+        return_value=GEOWEAVER_JAR_CHANNEL_LEGACY,
+    ):
+        assert resolve_geoweaver_jar_channel(str(jar)) == GEOWEAVER_JAR_CHANNEL_LEGACY
 
 
 def test_get_geoweaver_jar_version_from_build_info(tmp_path):
