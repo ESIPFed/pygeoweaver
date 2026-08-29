@@ -204,6 +204,39 @@ assert_clean_enough() {
 $(git status --short)"
 }
 
+ensure_on_target_branch() {
+  # Always release from a fast-forward of origin/TARGET_BRANCH — never push a
+  # feature-branch tip onto main (non-fast-forward / rewrite risk).
+  run git fetch origin "$TARGET_BRANCH" --tags >/dev/null 2>&1 || true
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] would checkout and update ${TARGET_BRANCH} from origin"
+    return 0
+  fi
+
+  local current_branch
+  current_branch="$(git rev-parse --abbrev-ref HEAD)"
+  if [[ "$current_branch" != "$TARGET_BRANCH" ]]; then
+    warn "Checking out '${TARGET_BRANCH}' (was on '${current_branch}') for release."
+    if git show-ref --verify --quiet "refs/heads/${TARGET_BRANCH}"; then
+      git checkout "$TARGET_BRANCH"
+    else
+      git checkout -B "$TARGET_BRANCH" "origin/${TARGET_BRANCH}"
+    fi
+  fi
+
+  git pull --ff-only "origin" "$TARGET_BRANCH" \
+    || die "Could not fast-forward ${TARGET_BRANCH} to origin/${TARGET_BRANCH}. Resolve locally, then re-run."
+
+  # Refresh version after checkout — pyproject may differ from previous branch.
+  CURRENT_VERSION="$(read_pyproject_version)"
+  if [[ -n "$AUTO_BUMP" && -z "$VERSION_ARG" ]]; then
+    VERSION="$(normalize_version "$(compute_auto_version "$CURRENT_VERSION" "$AUTO_BUMP")")"
+    TAG="v${VERSION}"
+    log "Recomputed version on ${TARGET_BRANCH}: $VERSION"
+  fi
+}
+
 confirm() {
   local msg="$1"
   if [[ "$YES" -eq 1 || "$DRY_RUN" -eq 1 ]]; then
@@ -346,29 +379,29 @@ fi
 assert_clean_enough
 confirm "Publish pygeoweaver ${VERSION} to GitHub + PyPI from branch ${TARGET_BRANCH}?"
 
-# Ensure we have latest target branch refs
-run git fetch origin "$TARGET_BRANCH" --tags >/dev/null 2>&1 || true
+ensure_on_target_branch
 
 if [[ "$DO_BUMP" -eq 1 ]]; then
-  log "Bumping pyproject.toml to $VERSION"
+  log "Bumping pyproject.toml to $VERSION on ${TARGET_BRANCH}"
   if [[ "$DRY_RUN" -eq 0 ]]; then
-    # Prefer releasing from TARGET_BRANCH tip when already on that branch
-    current_branch="$(git rev-parse --abbrev-ref HEAD)"
-    if [[ "$current_branch" != "$TARGET_BRANCH" ]]; then
-      warn "You are on branch '$current_branch', but release target is '$TARGET_BRANCH'."
-      warn "Bump commit will be pushed to origin/${TARGET_BRANCH} from HEAD."
-      confirm "Continue pushing HEAD to origin/${TARGET_BRANCH}?"
-    fi
     bump_pyproject_version "$VERSION"
+    # Re-read in case bump was a no-op string rewrite
+    CURRENT_VERSION="$(read_pyproject_version)"
     git add pyproject.toml
     if git diff --cached --quiet; then
       log "pyproject.toml already at $VERSION (nothing to commit)"
     else
       git commit -m "Release pygeoweaver ${VERSION}"
     fi
-    run git push origin "HEAD:${TARGET_BRANCH}"
+    # Only push the current TARGET_BRANCH tip (must be FF to remote).
+    if git merge-base --is-ancestor "origin/${TARGET_BRANCH}" HEAD 2>/dev/null \
+      || [[ "$(git rev-parse HEAD)" == "$(git rev-parse "origin/${TARGET_BRANCH}")" ]]; then
+      run git push origin "refs/heads/${TARGET_BRANCH}:${TARGET_BRANCH}"
+    else
+      die "Local ${TARGET_BRANCH} is not a fast-forward of origin/${TARGET_BRANCH}; refusing to push."
+    fi
   else
-    log "[dry-run] would bump pyproject.toml, commit, and push to $TARGET_BRANCH"
+    log "[dry-run] would bump pyproject.toml, commit, and push ${TARGET_BRANCH}"
   fi
 else
   remote_ver="$(
