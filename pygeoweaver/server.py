@@ -17,7 +17,7 @@ from pygeoweaver.h2_utils import (
     prepare_h2_database_for_start,
     warn_oversized_h2_on_lifecycle,
 )
-from pygeoweaver.jdk_utils import check_java
+from pygeoweaver.jdk_utils import check_java, ensure_geoweaver_runtime, get_default_managed_jdk17_home
 from pygeoweaver.pgw_log_config import get_logger
 from pygeoweaver.utils import (
     check_ipython,
@@ -77,15 +77,16 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
         subprocess.run(["taskkill", "/f", "/im", "geoweaver.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     with get_spinner(text=f'Check if Java is installed...', spinner='dots'):
-        java_cmd = "java"
-        try:
-            subprocess.run(["where", "java"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        except subprocess.CalledProcessError:
-            # Java command not found in PATH, check JDK folder in home directory
-            jdk_home = os.path.join(home_dir, "jdk", "jdk-11.0.18+10")  # Change this to your JDK installation directory
-            print("Check jdk_home", jdk_home)
-            java_cmd = os.path.join(jdk_home, "bin", "java.exe")
-            if not os.path.exists(java_cmd):
+        runtime = ensure_geoweaver_runtime()
+        java_cmd = runtime.java_bin
+        if java_cmd == "java":
+            java_cmd = "java.exe"
+        if java_cmd not in ("java", "java.exe") and not os.path.exists(java_cmd):
+            jdk_home = get_default_managed_jdk17_home()
+            candidate = os.path.join(jdk_home, "bin", "java.exe")
+            if os.path.exists(candidate):
+                java_cmd = candidate
+            else:
                 print("Java command not found.")
                 safe_exit(1)
 
@@ -139,9 +140,14 @@ def stop_on_windows(maintain_h2: bool = False, compact_h2: Optional[bool] = None
 
 def check_java_exists():
     with get_spinner(text=f'Check if Java is installed...', spinner='dots'):
+        runtime = ensure_geoweaver_runtime()
+        if runtime and runtime.java_bin:
+            print(f"Using Java: {runtime.java_bin} (channel={runtime.channel})")
+            return runtime.java_bin
+
         # Prefer auto-installed Temurin 17 home layout used by pygeoweaver.
         for candidate in (
-            os.path.expanduser("~/jdk/jdk-17.0.13+11/bin/java"),
+            os.path.join(get_default_managed_jdk17_home(), "bin", "java"),
             os.path.expanduser("~/jdk/jdk-11.0.18+10/bin/java"),  # legacy layout
         ):
             if os.path.isfile(candidate):
@@ -310,8 +316,9 @@ def stop_on_mac_linux(
 
 
 def start(force_download=False, force_restart=False, exit_on_finish=True):
+    # Resolve Java / jar channel first so download picks latest vs legacy correctly.
+    ensure_geoweaver_runtime()
     download_geoweaver_jar(overwrite=force_download)
-    check_java()
 
     if force_restart:
         stop(exit_on_finish=False, maintain_h2=False)

@@ -8,7 +8,11 @@ import platform
 
 from IPython import get_ipython
 from halo import Halo
-from pygeoweaver.constants import GEOWEAVER_URL
+from pygeoweaver.constants import (
+    GEOWEAVER_JAR_CHANNEL_LATEST,
+    GEOWEAVER_JAR_CHANNEL_LEGACY,
+    GEOWEAVER_URL,
+)
 from pygeoweaver.pgw_log_config import get_logger
 from pygeoweaver.pgw_spinner import Spinner
 
@@ -206,6 +210,118 @@ def get_geoweaver_jar_path():
     return f"{get_home_dir()}/geoweaver.jar"
 
 
+def get_geoweaver_jar_channel_marker_path():
+    """Marker file recording whether ~/geoweaver.jar is latest or legacy."""
+    return f"{get_home_dir()}/geoweaver.jar.channel"
+
+
+def read_geoweaver_jar_channel():
+    marker = get_geoweaver_jar_channel_marker_path()
+    if not os.path.isfile(marker):
+        return None
+    try:
+        with open(marker, "r", encoding="utf-8") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def write_geoweaver_jar_channel(channel):
+    marker = get_geoweaver_jar_channel_marker_path()
+    with open(marker, "w", encoding="utf-8") as f:
+        f.write(channel or GEOWEAVER_JAR_CHANNEL_LATEST)
+
+
+def get_geoweaver_jar_version(jar_path=None):
+    """
+    Read Geoweaver version from the JAR ``META-INF/MANIFEST.MF``.
+
+    Prefer ``Implementation-Version`` (set by the Spring Boot / Maven build).
+    Returns ``None`` if the jar is missing or the version cannot be parsed.
+    """
+    import zipfile
+
+    path = jar_path or get_geoweaver_jar_path()
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        with zipfile.ZipFile(path, "r") as zf:
+            # Spring Boot also writes build-info.properties; try both.
+            candidates = (
+                "META-INF/MANIFEST.MF",
+                "META-INF/build-info.properties",
+            )
+            for member in candidates:
+                try:
+                    raw = zf.read(member).decode("utf-8", errors="replace")
+                except KeyError:
+                    continue
+                version = _parse_version_from_metadata(raw, member)
+                if version:
+                    return version
+            # Fallback: Maven pom.properties inside the jar
+            for name in zf.namelist():
+                if name.endswith("pom.properties") and "/geoweaver/" in name.replace("\\", "/"):
+                    raw = zf.read(name).decode("utf-8", errors="replace")
+                    version = _parse_version_from_metadata(raw, name)
+                    if version:
+                        return version
+    except (OSError, zipfile.BadZipFile, KeyError) as exc:
+        logger.debug("Unable to read Geoweaver jar version from %s: %s", path, exc)
+    return None
+
+
+def _parse_version_from_metadata(raw, source_name=""):
+    """Extract a version string from MANIFEST.MF or *.properties content."""
+    import re
+
+    if "MANIFEST" in source_name.upper() or "Manifest-Version" in raw:
+        match = re.search(
+            r"(?im)^Implementation-Version:\s*(.+?)\s*$",
+            raw,
+        )
+        if match:
+            return match.group(1).strip()
+    # build-info.properties / pom.properties: build.version=... or version=...
+    for key in ("build.version", "version"):
+        match = re.search(rf"(?im)^{re.escape(key)}\s*=\s*(.+?)\s*$", raw)
+        if match:
+            value = match.group(1).strip()
+            if value and value.lower() not in ("null", "unknown"):
+                return value
+    return None
+
+
+def infer_geoweaver_jar_channel(version=None, jar_path=None):
+    """
+    Infer jar channel from version when the channel marker is missing.
+
+    Geoweaver 2.2+ maps to ``latest``; 2.1.x (and older) maps to ``legacy``.
+    """
+    version = version if version is not None else get_geoweaver_jar_version(jar_path)
+    if not version:
+        return None
+    # Strip common suffixes: 2.2.0-SNAPSHOT -> 2.2.0
+    import re
+
+    match = re.match(r"^(\d+)(?:\.(\d+))?", version.strip())
+    if not match:
+        return None
+    major = int(match.group(1))
+    minor = int(match.group(2) or 0)
+    if major > 2 or (major == 2 and minor >= 2):
+        return GEOWEAVER_JAR_CHANNEL_LATEST
+    return GEOWEAVER_JAR_CHANNEL_LEGACY
+
+
+def resolve_geoweaver_jar_channel(jar_path=None):
+    """Return marker channel, else infer from jar version, else None."""
+    channel = read_geoweaver_jar_channel()
+    if channel:
+        return channel
+    return infer_geoweaver_jar_channel(jar_path=jar_path)
+
+
 def check_geoweaver_jar():
     """
     Check if the Geoweaver JAR file exists.
@@ -213,29 +329,58 @@ def check_geoweaver_jar():
     return os.path.isfile(get_geoweaver_jar_path())
 
 
-def download_geoweaver_jar(overwrite=False):
+def download_geoweaver_jar(overwrite=False, url=None, channel=None):
     """
-    Download the latest version of Geoweaver JAR file.
-    """
-    with get_spinner(text='Checking Geoweaver JAR file...', spinner='dots'):
-        if check_geoweaver_jar():
-            if overwrite:
-                os.remove(get_geoweaver_jar_path())
-            else:
-                system = platform.system()
-                if not system == "Windows":  # Windows files are exec by default
-                    subprocess.run(
-                        ["chmod", "+x", get_geoweaver_jar_path()], cwd=f"{get_root_dir()}/"
-                    )
-                return
+    Download Geoweaver JAR file matching the resolved runtime channel.
 
-    with get_spinner(text='Downloading latest version of Geoweaver...', spinner='dots'):
-        r = requests.get(GEOWEAVER_URL)
-        with open(get_geoweaver_jar_path(), "wb") as f:
+    If ``url`` / ``channel`` are omitted, ``ensure_geoweaver_runtime()`` decides
+    between latest (2.2+, Java 17+) and legacy (2.1.x, older JDKs).
+    Re-downloads when the channel marker differs from the desired channel.
+    """
+    # Lazy import avoids circular dependency with jdk_utils -> utils.
+    from pygeoweaver.jdk_utils import ensure_geoweaver_runtime
+
+    runtime = ensure_geoweaver_runtime()
+    jar_url = url or runtime.jar_url or GEOWEAVER_URL
+    jar_channel = channel or runtime.channel or GEOWEAVER_JAR_CHANNEL_LATEST
+    jar_path = get_geoweaver_jar_path()
+    current_channel = read_geoweaver_jar_channel()
+    channel_mismatch = check_geoweaver_jar() and current_channel and current_channel != jar_channel
+
+    with get_spinner(text='Checking Geoweaver JAR file...', spinner='dots'):
+        if check_geoweaver_jar() and not overwrite and not channel_mismatch:
+            system = platform.system()
+            if not system == "Windows":  # Windows files are exec by default
+                subprocess.run(
+                    ["chmod", "+x", jar_path], cwd=f"{get_root_dir()}/"
+                )
+            return
+
+    if channel_mismatch and check_geoweaver_jar():
+        print(
+            f"Geoweaver jar channel changed ({current_channel} -> {jar_channel}); "
+            "re-downloading..."
+        )
+        try:
+            os.remove(jar_path)
+        except OSError:
+            pass
+    elif overwrite and check_geoweaver_jar():
+        try:
+            os.remove(jar_path)
+        except OSError:
+            pass
+
+    label = "legacy Geoweaver 2.1.x" if jar_channel != GEOWEAVER_JAR_CHANNEL_LATEST else "latest Geoweaver"
+    with get_spinner(text=f'Downloading {label}...', spinner='dots'):
+        r = requests.get(jar_url)
+        r.raise_for_status()
+        with open(jar_path, "wb") as f:
             f.write(r.content)
 
         if check_geoweaver_jar():
-            print("Geoweaver.jar is downloaded")
+            write_geoweaver_jar_channel(jar_channel)
+            print(f"Geoweaver.jar downloaded ({jar_channel}): {jar_url}")
         else:
             raise RuntimeError("Fail to download geoweaver.jar")
 

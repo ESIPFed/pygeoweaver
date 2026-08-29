@@ -13,12 +13,23 @@ PyGeoWeaver is a Python package that provides a convenient and user-friendly int
 
 ## Installation
 
-To install PyGeoWeaver, ensure you have **Python 3.7+** and **Java 17+** installed.
-Latest Geoweaver (2.2+ / Spring Boot 3) **no longer supports JDK &lt; 17**.
+To install PyGeoWeaver, ensure you have **Python 3.7+**.
 
-If you cannot upgrade Java, stay on **Geoweaver 2.1.x** (Java 11):
-[Releases](https://github.com/ESIPFed/Geoweaver/releases)
-(example: [v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar)).
+**Java / Geoweaver selection (automatic):**
+
+- **Java 17+** → downloads and runs **latest Geoweaver** (2.2+ / Spring Boot 3) from the `latest` release asset.
+- **No Java** → PyGeoWeaver installs **Temurin 17** under `~/jdk`, then uses latest Geoweaver.
+- **PyGeoWeaver-managed JDK** (`~/jdk/...`) older than 17 → **bumps that JDK to 17** before start, then uses latest Geoweaver.
+- **System JDK older than 17** (not under `~/jdk`) → keeps your JDK and automatically uses **Geoweaver 2.1.x** (legacy jar), with a clear warning.
+
+You can also install a managed JDK yourself:
+
+```bash
+gw installjdk
+```
+
+Manual legacy jar (optional):
+[v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar).
 
 You can then install PyGeoWeaver using pip:
 
@@ -122,6 +133,21 @@ For detailed documentation and examples, please visit the [PyGeoWeaver Documenta
 ## Contributing
 
 Contributions to PyGeoWeaver are welcome! If you encounter any issues or have suggestions for improvements, please feel free to open an issue or submit a pull request on the GitHub repository.
+
+## Releasing
+
+Maintainers can publish a new version to GitHub Releases + PyPI with:
+
+```bash
+# After merging the release branch to main:
+./scripts/publish-release.sh 1.4.0 --bump
+# Or auto-increment patch from pyproject.toml:
+./scripts/publish-release.sh --bump-patch
+# Preview only:
+./scripts/publish-release.sh 1.4.0 --bump --dry-run
+```
+
+This bumps `pyproject.toml` (optional), pushes to `main`, creates tag `vX.Y.Z`, waits for `.github/workflows/publish-to-pypi.yml`, and checks PyPI. Requires `gh` auth and the repo secret `PYPI_API_TOKEN`.
 
 ## License
 

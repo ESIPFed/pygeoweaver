@@ -84,7 +84,13 @@ def test_status_cli_json(monkeypatch):
                 "meets_min_version": True,
                 "min_required_major": 17,
             },
-            "geoweaver_jar": {"path": "/tmp/geoweaver.jar", "exists": False, "size_human": "n/a"},
+            "geoweaver_jar": {
+                "path": "/tmp/geoweaver.jar",
+                "exists": False,
+                "size_human": "n/a",
+                "version": None,
+                "channel": None,
+            },
             "h2_tool_jar": {"path": None, "exists": False},
             "config": {
                 "properties_path": "/tmp/p",
@@ -108,3 +114,46 @@ def test_status_cli_json(monkeypatch):
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["credentials_redacted"] is True
+
+
+def test_get_geoweaver_jar_version_from_manifest(tmp_path):
+    import zipfile
+
+    from pygeoweaver.constants import GEOWEAVER_JAR_CHANNEL_LATEST, GEOWEAVER_JAR_CHANNEL_LEGACY
+    from pygeoweaver.utils import (
+        get_geoweaver_jar_version,
+        infer_geoweaver_jar_channel,
+        resolve_geoweaver_jar_channel,
+    )
+
+    jar = tmp_path / "geoweaver.jar"
+    with zipfile.ZipFile(jar, "w") as zf:
+        zf.writestr(
+            "META-INF/MANIFEST.MF",
+            "Manifest-Version: 1.0\n"
+            "Implementation-Title: geoweaver\n"
+            "Implementation-Version: 2.1.1\n"
+            "Main-Class: org.springframework.boot.loader.JarLauncher\n",
+        )
+
+    assert get_geoweaver_jar_version(str(jar)) == "2.1.1"
+    assert infer_geoweaver_jar_channel("2.1.1") == GEOWEAVER_JAR_CHANNEL_LEGACY
+    assert infer_geoweaver_jar_channel("2.2.0") == GEOWEAVER_JAR_CHANNEL_LATEST
+    assert infer_geoweaver_jar_channel("2.2.0-SNAPSHOT") == GEOWEAVER_JAR_CHANNEL_LATEST
+    assert resolve_geoweaver_jar_channel(str(jar)) == GEOWEAVER_JAR_CHANNEL_LEGACY
+
+
+def test_get_geoweaver_jar_version_from_build_info(tmp_path):
+    import zipfile
+
+    from pygeoweaver.utils import get_geoweaver_jar_version
+
+    jar = tmp_path / "geoweaver.jar"
+    with zipfile.ZipFile(jar, "w") as zf:
+        zf.writestr("META-INF/MANIFEST.MF", "Manifest-Version: 1.0\n")
+        zf.writestr(
+            "META-INF/build-info.properties",
+            "build.artifact=geoweaver\nbuild.version=2.2.0\n",
+        )
+
+    assert get_geoweaver_jar_version(str(jar)) == "2.2.0"
