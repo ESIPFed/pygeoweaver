@@ -1,18 +1,24 @@
 """
 Create or rotate the Geoweaver Agent API Bearer token.
 
-Wraps: java -jar ~/geoweaver.jar agent-token --create
-Token is written to the path configured in Geoweaver
-(default: ~/gw-workspace/.agent_api_token).
+Two modes:
+1) Local jar: java -jar ~/geoweaver.jar agent-token --create
+2) Remote HTTP: POST {base}/api/v1/tokens with GUI localhost password
+   (works from any machine that can reach a public or private Geoweaver URL)
 """
 
 from __future__ import annotations
 
+import getpass
+import json
 import os
 import re
 import subprocess
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import List, Optional
+from urllib.parse import urljoin, urlparse
 
 from pygeoweaver.utils import (
     download_geoweaver_jar,
@@ -43,6 +49,7 @@ class AgentTokenResult:
     token: Optional[str]
     fingerprint: Optional[str]
     token_file: Optional[str]
+    mode: str = "local"  # local | remote
 
     @property
     def ok(self) -> bool:
@@ -64,6 +71,24 @@ def build_agent_token_command(
     if create:
         cmd.append("--create")
     return cmd
+
+
+def normalize_base_url(base_url: str) -> str:
+    """Ensure base URL includes scheme and ends without trailing slash noise for join."""
+    if not base_url or not str(base_url).strip():
+        raise ValueError("base_url is required")
+    u = str(base_url).strip().rstrip("/")
+    parsed = urlparse(u)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("base_url must be an absolute http(s) URL including host")
+    return u
+
+
+def tokens_endpoint(base_url: str) -> str:
+    """Build POST .../api/v1/tokens from GEOWEAVER_BASE_URL."""
+    base = normalize_base_url(base_url)
+    # base already includes /Geoweaver
+    return urljoin(base + "/", "api/v1/tokens")
 
 
 def parse_agent_token_output(stdout: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
@@ -137,6 +162,102 @@ def create_or_rotate_agent_token(
         token=token,
         fingerprint=fingerprint,
         token_file=token_file or default_token_file_hint(),
+        mode="local",
+    )
+
+
+def create_agent_token_remote(
+    base_url: str,
+    host_password: str,
+    *,
+    urlopen=urllib.request.urlopen,
+    timeout: float = 30.0,
+) -> AgentTokenResult:
+    """
+    POST /api/v1/tokens with the GUI localhost password. No Bearer required.
+
+    Security: password proves operator knowledge of the Geoweaver host secret.
+    """
+    if not host_password:
+        return AgentTokenResult(
+            returncode=2,
+            stdout="",
+            stderr="hostPassword is required",
+            token=None,
+            fingerprint=None,
+            token_file=None,
+            mode="remote",
+        )
+    endpoint = tokens_endpoint(base_url)
+    payload = json.dumps({"hostPassword": host_password}).encode("utf-8")
+    req = urllib.request.Request(
+        endpoint,
+        data=payload,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            status = getattr(resp, "status", 200)
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        return AgentTokenResult(
+            returncode=e.code,
+            stdout=err_body,
+            stderr=f"HTTP {e.code} from {endpoint}",
+            token=None,
+            fingerprint=None,
+            token_file=None,
+            mode="remote",
+        )
+    except Exception as e:  # noqa: BLE001 — surface network failures to CLI
+        return AgentTokenResult(
+            returncode=1,
+            stdout="",
+            stderr=str(e),
+            token=None,
+            fingerprint=None,
+            token_file=None,
+            mode="remote",
+        )
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        return AgentTokenResult(
+            returncode=1,
+            stdout=body,
+            stderr="Response was not JSON",
+            token=None,
+            fingerprint=None,
+            token_file=None,
+            mode="remote",
+        )
+
+    token = data.get("token")
+    fingerprint = data.get("fingerprint")
+    if status not in (200, 201) or not token:
+        return AgentTokenResult(
+            returncode=status if isinstance(status, int) else 1,
+            stdout=body,
+            stderr="Token missing in response",
+            token=None,
+            fingerprint=fingerprint,
+            token_file=None,
+            mode="remote",
+        )
+    return AgentTokenResult(
+        returncode=0,
+        stdout=body,
+        stderr="",
+        token=token,
+        fingerprint=fingerprint,
+        token_file=None,
+        mode="remote",
     )
 
 
@@ -144,8 +265,10 @@ def format_agent_token_success(result: AgentTokenResult) -> str:
     """Human-readable success message (token shown once, as Geoweaver CLI does)."""
     lines = [
         "Geoweaver Agent API token ready.",
-        f"Token file: {result.token_file or default_token_file_hint()}",
+        f"Mode: {result.mode}",
     ]
+    if result.token_file:
+        lines.append(f"Token file: {result.token_file}")
     if result.fingerprint:
         lines.append(f"Fingerprint: {result.fingerprint}")
     lines.append("")
@@ -165,6 +288,9 @@ def format_agent_token_success(result: AgentTokenResult) -> str:
     lines.append("  # Prefer reverse proxy to loopback; if JVM binds public interfaces:")
     lines.append("  # geoweaver.agent.allow-non-loopback=true")
     lines.append("  server.address=127.0.0.1")
+    lines.append("")
+    lines.append("Remote mint from another machine (GUI localhost password):")
+    lines.append("  gw agent-token --create --base-url \"$GEOWEAVER_BASE_URL\"")
     return "\n".join(lines)
 
 
@@ -172,7 +298,9 @@ def format_agent_token_failure(result: AgentTokenResult) -> str:
     """Human-readable failure message without guessing secrets."""
     parts = [
         "Failed to create Geoweaver Agent API token.",
-        "Requires a Geoweaver jar that includes the `agent-token` command (Agent API).",
+        f"Mode: {result.mode}",
+        "Local mode needs a Geoweaver jar with `agent-token`.",
+        "Remote mode needs api-enabled=true and the GUI localhost password.",
         f"Exit code: {result.returncode}",
     ]
     err = (result.stderr or "").strip()
@@ -189,18 +317,33 @@ def run_agent_token_cli(
     create: bool,
     echo,
     style=None,
+    base_url: Optional[str] = None,
+    password: Optional[str] = None,
+    prompt_password=getpass.getpass,
 ) -> int:
     """
     CLI entry used by Click. Returns process exit code.
     ``echo`` is click.echo (injectable for tests).
+
+    If ``base_url`` is set, uses remote POST /api/v1/tokens with localhost password.
     """
     if not create:
-        echo("Usage: gw agent-token --create")
-        echo("Create or rotate the Geoweaver Agent API Bearer token file.")
-        echo(f"Default token file: {default_token_file_hint()}")
+        echo("Usage:")
+        echo("  gw agent-token --create")
+        echo("  gw agent-token --create --base-url https://host/Geoweaver")
+        echo("Create or rotate the Geoweaver Agent API Bearer token.")
+        echo(f"Default local token file: {default_token_file_hint()}")
+        echo("Remote mode requires the GUI localhost password (prompted if omitted).")
         return 0
 
-    result = create_or_rotate_agent_token(create=True)
+    if base_url:
+        pw = password
+        if not pw:
+            pw = prompt_password("Geoweaver localhost password: ")
+        result = create_agent_token_remote(base_url, pw or "")
+    else:
+        result = create_or_rotate_agent_token(create=True)
+
     if result.ok:
         msg = format_agent_token_success(result)
         if style:

@@ -84,14 +84,15 @@ gw status --json
   ```
 
 - **Agent API token**: Create or rotate the Bearer token used by coding agents
-  (Cursor / Codex / Claude Code) against Geoweaver `/api/v1` on a local or
-  public deployment. Run this on the Geoweaver **server** (or any machine that
-  shares the same token file path). Requires a Geoweaver jar that includes the
-  Java `agent-token` command.
+  (Cursor / Codex / Claude Code) against Geoweaver `/api/v1`.
   ```shell
+# Local (on the Geoweaver host — writes token file via jar CLI)
 gw agent-token --create
+
+# Remote (any machine): uses GUI localhost password → POST /api/v1/tokens
+export GEOWEAVER_BASE_URL='https://your-host.example/Geoweaver'
+gw agent-token --create --base-url "$GEOWEAVER_BASE_URL"   # prompts for password
 export GEOWEAVER_API_TOKEN='…'   # printed once; do not commit
-export GEOWEAVER_BASE_URL='https://your-host.example/Geoweaver'  # or http://127.0.0.1:8070/Geoweaver
   ```
 
 - **Listing Existing Objects**: Lists hosts, processes, and workflows.
