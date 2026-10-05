@@ -36,6 +36,7 @@ from pygeoweaver.commands.pgw_sync import sync, sync_workflow
 from pygeoweaver.commands.pgw_upgrade import upgrade_geoweaver
 from pygeoweaver.commands.pgw_status import show_geoweaver_status
 from pygeoweaver.commands.pgw_cleanh2backups import clean_h2_backups_command
+from pygeoweaver.commands.pgw_agent_token import run_agent_token_cli
 from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.server import show
 from halo import Halo
@@ -96,6 +97,54 @@ def reset_password_command():
     Reset the password for localhost.
     """
     reset_password()
+
+
+@geoweaver.command("agent-token")
+@click.option(
+    "--create/--no-create",
+    "create",
+    default=False,
+    help="Create or rotate the Agent API Bearer token (invalidates the previous token).",
+)
+@click.option(
+    "--rotate",
+    "rotate",
+    is_flag=True,
+    default=False,
+    help="Same as --create: write a new token and invalidate the old one.",
+)
+@click.option(
+    "--base-url",
+    "base_url",
+    default=None,
+    envvar="GEOWEAVER_BASE_URL",
+    help="Remote Geoweaver base URL (e.g. https://host/Geoweaver). Uses POST /api/v1/tokens with localhost password.",
+)
+@click.option(
+    "--password",
+    "password",
+    default=None,
+    help="GUI localhost password for remote mint (prefer omit to prompt securely).",
+)
+def agent_token_command(create, rotate, base_url, password):
+    """
+    Create or rotate the Geoweaver Agent API token for /api/v1 (coding agents).
+
+    Local (default): writes the token file via java -jar … agent-token --create.
+
+    Remote: gw agent-token --create --base-url https://host/Geoweaver
+    posts hostPassword to /api/v1/tokens (no Bearer; rate-limited on server).
+    """
+    do_create = bool(create or rotate)
+    code = run_agent_token_cli(
+        create=do_create,
+        echo=click.echo,
+        style=click.style,
+        base_url=base_url,
+        password=password,
+    )
+    if code != 0:
+        raise SystemExit(code)
 
 
 @geoweaver.command("cleanup_workspace")

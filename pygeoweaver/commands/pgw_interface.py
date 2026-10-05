@@ -10,6 +10,10 @@ from pygeoweaver.commands.pgw_list import *
 from pygeoweaver.commands.pgw_run import *
 from pygeoweaver.server import *
 from pygeoweaver.commands.pgw_resetpassword import *
+from pygeoweaver.commands.pgw_agent_token import (
+    create_or_rotate_agent_token,
+    run_agent_token_cli,
+)
 from pygeoweaver.commands.pgw_help import *
 from pygeoweaver.commands.pgw_create import *
 from pygeoweaver.commands.pgw_sync import *
