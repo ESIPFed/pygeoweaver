@@ -36,6 +36,7 @@ from pygeoweaver.commands.pgw_sync import sync, sync_workflow
 from pygeoweaver.commands.pgw_upgrade import upgrade_geoweaver
 from pygeoweaver.commands.pgw_status import show_geoweaver_status
 from pygeoweaver.commands.pgw_cleanh2backups import clean_h2_backups_command
+from pygeoweaver.commands.pgw_agent_token import run_agent_token_cli
 from pygeoweaver.pgw_log_config import setup_logging
 from pygeoweaver.server import show
 from halo import Halo
@@ -96,6 +97,34 @@ def reset_password_command():
     Reset the password for localhost.
     """
     reset_password()
+
+
+@geoweaver.command("agent-token")
+@click.option(
+    "--create/--no-create",
+    "create",
+    default=False,
+    help="Create or rotate the Agent API Bearer token (invalidates the previous token).",
+)
+@click.option(
+    "--rotate",
+    "rotate",
+    is_flag=True,
+    default=False,
+    help="Same as --create: write a new token and invalidate the old one.",
+)
+def agent_token_command(create, rotate):
+    """
+    Create or rotate the Geoweaver Agent API token for /api/v1 (coding agents).
+
+    Writes the token file (default ~/gw-workspace/.agent_api_token) and prints
+    export GEOWEAVER_API_TOKEN=... once. Requires a Geoweaver jar that includes
+    the Java `agent-token` command.
+    """
+    do_create = bool(create or rotate)
+    code = run_agent_token_cli(create=do_create, echo=click.echo, style=click.style)
+    if code != 0:
+        raise SystemExit(code)
 
 
 @geoweaver.command("cleanup_workspace")
