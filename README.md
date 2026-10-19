@@ -28,6 +28,8 @@ You can also install a managed JDK yourself:
 gw installjdk
 ```
 
+**Cluster / no-sudo note (fixed in 1.4.1):** an old `~/jdk.tar.gz` from Java 11 must not be reused when installing Temurin 17. PyGeoWeaver now detects a mismatched archive, downloads a fresh copy, and moves aside other `~/jdk/jdk-*` folders before extract so `Permission denied` on locked `jdk-11*` files is avoided.
+
 Manual legacy jar (optional):
 [v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar).
 
@@ -144,7 +146,7 @@ Maintainers can publish a new version to GitHub Releases + PyPI with:
 # Or auto-increment patch from pyproject.toml:
 ./scripts/publish-release.sh --bump-patch
 # Preview only:
-./scripts/publish-release.sh 1.4.0 --bump --dry-run
+./scripts/publish-release.sh 1.4.1 --bump --dry-run
 ```
 
 This bumps `pyproject.toml` (optional), pushes to `main`, creates tag `vX.Y.Z`, waits for `.github/workflows/publish-to-pypi.yml`, and checks PyPI. Requires `gh` auth and the repo secret `PYPI_API_TOKEN`.
