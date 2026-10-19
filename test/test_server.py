@@ -4,7 +4,27 @@ Tests for pygeoweaver server start/stop lifecycle.
 from unittest.mock import patch
 
 from pygeoweaver import start, stop
-from pygeoweaver.server import show
+from pygeoweaver.server import (
+    geoweaver_endpoint_url,
+    is_geoweaver_http_ready,
+    show,
+)
+
+
+def test_is_geoweaver_http_ready_accepts_boot3_and_redirects():
+    for code in (200, 301, 302, 303, "200", "302"):
+        assert is_geoweaver_http_ready(code)
+    for code in (0, 404, 500, 503, "", None, "ok"):
+        assert not is_geoweaver_http_ready(code)
+
+
+def test_geoweaver_endpoint_url_honors_env_port(monkeypatch):
+    monkeypatch.setenv("GEOWEAVER_PORT", "23456")
+    assert geoweaver_endpoint_url() == "http://localhost:23456/Geoweaver"
+    monkeypatch.delenv("GEOWEAVER_PORT", raising=False)
+    # Falls back to constant default (usually 8070) when unset
+    assert "localhost" in geoweaver_endpoint_url()
+    assert geoweaver_endpoint_url().endswith("/Geoweaver")
 
 
 @patch("pygeoweaver.server._wait_for_geoweaver_shutdown", return_value=True)
