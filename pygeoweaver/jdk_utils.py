@@ -4,6 +4,7 @@ import subprocess
 import shutil
 import sys
 import tarfile
+import time
 import zipfile
 import urllib.request
 
@@ -252,6 +253,176 @@ def install_jdk():
         print("Unsupported platform.")
 
 
+def managed_jdk_dir_name(jdk_version):
+    """Temurin folder name under ~/jdk, e.g. ``jdk-17.0.13+11``."""
+    return f"jdk-{jdk_version.replace('-', '+')}"
+
+
+def move_aside_path(path):
+    """
+    Rename ``path`` to ``path.bak.<timestamp>`` so a fresh install can proceed.
+
+    Renaming only needs write permission on the parent directory (typical for
+    cluster home installs without sudo). Returns the backup path, or None.
+    """
+    if not path or not os.path.exists(path):
+        return None
+    stamp = time.strftime("%Y%m%d%H%M%S")
+    backup = f"{path}.bak.{stamp}"
+    n = 0
+    while os.path.exists(backup):
+        n += 1
+        backup = f"{path}.bak.{stamp}.{n}"
+    os.rename(path, backup)
+    print(f"Moved aside {path} -> {backup}")
+    return backup
+
+
+def archive_top_level_name(archive_path):
+    """Return the first top-level path component inside a JDK tar/zip, or None."""
+    try:
+        if archive_path.endswith(".zip"):
+            with zipfile.ZipFile(archive_path) as zip_ref:
+                for name in zip_ref.namelist():
+                    top = name.replace("\\", "/").split("/")[0]
+                    if top:
+                        return top
+        else:
+            with tarfile.open(archive_path, "r:gz") as tar_ref:
+                for member in tar_ref.getmembers():
+                    top = member.name.replace("\\", "/").split("/")[0]
+                    if top:
+                        return top
+    except Exception:
+        return None
+    return None
+
+
+def archive_matches_jdk_version(archive_path, jdk_version):
+    """True if the archive's top-level directory matches the Temurin version layout."""
+    if not archive_path or not os.path.isfile(archive_path):
+        return False
+    top = archive_top_level_name(archive_path)
+    if not top:
+        return False
+    expected = managed_jdk_dir_name(jdk_version)
+    if top == expected:
+        return True
+    # Accept any jdk-17* when installing a 17.x build (patch-level drift in cache).
+    if jdk_version.startswith("17") and top.startswith("jdk-17"):
+        return True
+    return False
+
+
+def download_file(url, filename, force=False):
+    """
+    Download ``url`` to ``filename``.
+
+    When ``force`` is True, replace any existing file (after moving it aside).
+    """
+    if os.path.exists(filename):
+        if not force:
+            print(f"{filename} already exists.")
+            return
+        print(f"Replacing existing download cache: {filename}")
+        try:
+            move_aside_path(filename)
+        except OSError:
+            os.remove(filename)
+    print(f"Downloading {filename}...", url)
+    urllib.request.urlretrieve(url, filename)
+    print(f"{filename} downloaded.")
+
+
+def download_jdk_archive(url, filename, jdk_version):
+    """
+    Ensure ``filename`` holds the Temurin archive for ``jdk_version``.
+
+    A leftover ``~/jdk.tar.gz`` from an older Java 11 install must not be reused:
+    extracting it again over ``~/jdk/jdk-11*`` causes PermissionError on locked files.
+    """
+    if os.path.isfile(filename) and archive_matches_jdk_version(filename, jdk_version):
+        print(f"{filename} already exists and matches JDK {jdk_version}.")
+        return
+    if os.path.isfile(filename):
+        top = archive_top_level_name(filename)
+        print(
+            f"{filename} is stale or mismatched "
+            f"(archive top-level: {top!r}; need {managed_jdk_dir_name(jdk_version)!r}). "
+            "Downloading a fresh copy..."
+        )
+        download_file(url, filename, force=True)
+        return
+    download_file(url, filename, force=False)
+
+
+def prepare_managed_jdk_root(jdk_install_dir, jdk_version):
+    """
+    Create ``~/jdk`` and move aside other managed JDK homes before extract.
+
+    This avoids extractall writing into an old ``jdk-11*`` tree when a stale
+    archive is present, and keeps the install directory writable without sudo.
+    """
+    os.makedirs(jdk_install_dir, exist_ok=True)
+    expected = managed_jdk_dir_name(jdk_version)
+    try:
+        names = os.listdir(jdk_install_dir)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Cannot list managed JDK directory {jdk_install_dir}: {exc}"
+        ) from exc
+
+    for name in names:
+        path = os.path.join(jdk_install_dir, name)
+        if not os.path.isdir(path):
+            continue
+        if not name.startswith("jdk-"):
+            continue
+        if name == expected:
+            continue
+        try:
+            move_aside_path(path)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Cannot move aside old managed JDK at {path}: {exc}. "
+                f"From your account (no sudo), run: mv '{path}' '{path}.bak' "
+                f"and retry `gw installjdk`."
+            ) from exc
+
+
+def extract_tar_archive(archive_path, destination_dir):
+    """Extract a JDK tarball into ``destination_dir`` (creates dir if needed)."""
+    os.makedirs(destination_dir, exist_ok=True)
+    print(f"Extracting {archive_path}...")
+    try:
+        with tarfile.open(archive_path, "r:gz") as tar_ref:
+            tar_ref.extractall(destination_dir)
+    except PermissionError as exc:
+        raise PermissionError(
+            f"{exc}. A leftover Java 11 tree or archive under ~/jdk is blocking "
+            "the install. PyGeoWeaver will try to move old jdk-* folders aside; "
+            "if this persists, run: "
+            "mv ~/jdk.tar.gz ~/jdk.tar.gz.bak; mv ~/jdk ~/jdk.bak; gw installjdk"
+        ) from exc
+    print(f"{archive_path} extracted to {destination_dir}.")
+
+
+def extract_zip_archive(archive_path, destination_dir):
+    """Extract a JDK zip into ``destination_dir`` (creates dir if needed)."""
+    os.makedirs(destination_dir, exist_ok=True)
+    print(f"Extracting {archive_path}...")
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zip_ref:
+            zip_ref.extractall(destination_dir)
+    except PermissionError as exc:
+        raise PermissionError(
+            f"{exc}. A leftover Java 11 tree or archive under ~/jdk is blocking "
+            "the install. Run: mv ~/jdk.zip ~/jdk.zip.bak; "
+            "mv ~/jdk ~/jdk.bak; gw installjdk"
+        ) from exc
+    print(f"{archive_path} extracted to {destination_dir}.")
+
+
 def install_jdk_macos(jdk_version, jdk_arch):
     jdk_url = (
         f"https://github.com/adoptium/temurin17-binaries/releases/download/"
@@ -259,15 +430,12 @@ def install_jdk_macos(jdk_version, jdk_arch):
         f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.tar.gz"
     )
     jdk_install_dir = os.path.expanduser("~/jdk")
+    archive_path = f"{get_home_dir()}/jdk.tar.gz"
 
-    # Download JDK archive
-    download_file(jdk_url, f"{get_home_dir()}/jdk.tar.gz")
-
-    # Extract JDK archive
-    extract_tar_archive(f"{get_home_dir()}/jdk.tar.gz", jdk_install_dir)
-
-    # Set JDK environment variables
-    set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
+    download_jdk_archive(jdk_url, archive_path, jdk_version)
+    prepare_managed_jdk_root(jdk_install_dir, jdk_version)
+    extract_tar_archive(archive_path, jdk_install_dir)
+    set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
 
 
 def install_jdk_linux(jdk_version, jdk_arch):
@@ -277,15 +445,12 @@ def install_jdk_linux(jdk_version, jdk_arch):
         f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.tar.gz"
     )
     jdk_install_dir = os.path.expanduser("~/jdk")
+    archive_path = f"{get_home_dir()}/jdk.tar.gz"
 
-    # Download JDK archive
-    download_file(jdk_url, f"{get_home_dir()}/jdk.tar.gz")
-
-    # Extract JDK archive
-    extract_tar_archive(f"{get_home_dir()}/jdk.tar.gz", jdk_install_dir)
-
-    # Set JDK environment variables
-    set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
+    download_jdk_archive(jdk_url, archive_path, jdk_version)
+    prepare_managed_jdk_root(jdk_install_dir, jdk_version)
+    extract_tar_archive(archive_path, jdk_install_dir)
+    set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
 
 
 def install_jdk_windows(jdk_version, jdk_arch):
@@ -295,42 +460,12 @@ def install_jdk_windows(jdk_version, jdk_arch):
         f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.zip"
     )
     jdk_install_dir = os.path.expanduser("~/jdk")
+    archive_path = f"{get_home_dir()}/jdk.zip"
 
-    # Download JDK archive
-    download_file(jdk_url, f"{get_home_dir()}/jdk.zip")
-
-    # Extract JDK archive
-    extract_zip_archive(f"{get_home_dir()}/jdk.zip", jdk_install_dir)
-
-    # Set JDK environment variables
-    set_jdk_env_vars(f'{jdk_install_dir}/jdk-{jdk_version.replace("-", "+")}')
-
-
-def download_file(url, filename):
-    if os.path.exists(filename):
-        print(f"{filename} already exists.")
-        return
-    print(f"Downloading {filename}...", url)
-    urllib.request.urlretrieve(url, filename)
-    print(f"{filename} downloaded.")
-
-
-def extract_tar_archive(archive_path, destination_dir):
-    """Extract a JDK tarball into ``destination_dir`` (creates dir if needed)."""
-    os.makedirs(destination_dir, exist_ok=True)
-    print(f"Extracting {archive_path}...")
-    with tarfile.open(archive_path, "r:gz") as tar_ref:
-        tar_ref.extractall(destination_dir)
-    print(f"{archive_path} extracted to {destination_dir}.")
-
-
-def extract_zip_archive(archive_path, destination_dir):
-    """Extract a JDK zip into ``destination_dir`` (creates dir if needed)."""
-    os.makedirs(destination_dir, exist_ok=True)
-    print(f"Extracting {archive_path}...")
-    with zipfile.ZipFile(archive_path, "r") as zip_ref:
-        zip_ref.extractall(destination_dir)
-    print(f"{archive_path} extracted to {destination_dir}.")
+    download_jdk_archive(jdk_url, archive_path, jdk_version)
+    prepare_managed_jdk_root(jdk_install_dir, jdk_version)
+    extract_zip_archive(archive_path, jdk_install_dir)
+    set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
 
 
 def set_jdk_env_vars_for_windows(jdk_install_dir):
