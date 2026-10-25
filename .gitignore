@@ -15,3 +15,15 @@ pygeoweaver/__pycache__/utils.cpython-39.pyc
 .DS_Store
 nohup.out
 .DS_Store
+
+# Local AI-assistant workspaces and notes (never published)
+projects/
+software-workspaces.json
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.cursor/
+.cursorrules
+AGENTS.md
+.aider*
+.venv*/
