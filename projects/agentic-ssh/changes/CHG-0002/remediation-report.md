@@ -7,7 +7,7 @@
 | SEC-017 | Fallback extractor: per-member extraction resolved against the on-disk tree; absolute names rejected (a new test caught `lstrip("/")` + `extract()` writing to `/abs.txt`); modes masked 0o755 |
 | SEC-018 | Logs may be symlinks if the target is owned by the user |
 | SEC-019 | Tightened tar test; tests for IPv6/localhost, Windows, symlinked log, `-m` cwd; CI network test of pinned digests |
-| SEC-020 | Release only our own inode; Windows `msvcrt.locking` |
+| SEC-020 | Locks carry a random nonce (`pid@host#nonce`); release and stale-break compare content, not inode (Linux CI showed ext4 reuses a freed inode for the next file); Windows `msvcrt.locking` |
 | SEC-006(a) | `copy_with_deadline`: 1800 s overall cap for JDK and jar downloads |
 | SEC-021 | `_reaches` matches the exact address or a wildcard only (no `127.*` prefix) |
 | SEC-022 | Log opened without `O_TRUNC`; `ftruncate` only after the ownership check |

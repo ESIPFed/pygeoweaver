@@ -36,22 +36,34 @@ def _pid_alive(pid):
         return True
 
 
+def _read_lock(path):
+    try:
+        with open(path, "r") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
 def _excl_stale(path):
-    """Inode of ``path`` if its holder is gone (or it is too old), else None."""
+    """Content of ``path`` if its holder is gone (or it is too old), else None.
+
+    Locks are identified by content (``pid@host#nonce``), not inode: Linux reuses a freed
+    inode number for the very next file, so a successor's lock can have the same inode."""
     try:
         with open(path, "r") as f:
             st = os.fstat(f.fileno())
-            pid_s, _, host = f.read().strip().partition("@")
-    except (OSError, ValueError):
+            content = f.read()
+    except OSError:
         return None
+    pid_s, _, host = content.strip().split("#", 1)[0].partition("@")
     if host == socket.gethostname() and pid_s.isdigit():
         stale = not _pid_alive(int(pid_s))
     else:
         stale = time.time() - st.st_mtime > _STALE_SECONDS
-    return st.st_ino if stale else None
+    return content if stale else None
 
 
-def _break_stale(path, stale_ino):
+def _break_stale(path, stale_content):
     """
     Remove a stale lock without ever removing a fresh one: two waiters may both judge the
     same lock stale; the second must not delete the lock the first just created.
@@ -62,7 +74,7 @@ def _break_stale(path, stale_ino):
     except OSError:
         return
     try:
-        if os.stat(aside).st_ino != stale_ino:
+        if _read_lock(aside) != stale_content:
             # Took someone's fresh lock: put it back (link fails if a newer one exists).
             try:
                 os.link(aside, path)
@@ -83,14 +95,14 @@ def _excl_lock(path, timeout, what):
     while True:
         try:
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            os.write(fd, f"{os.getpid()}@{socket.gethostname()}".encode())
-            my_ino = os.fstat(fd).st_ino
+            mine = f"{os.getpid()}@{socket.gethostname()}#{os.urandom(8).hex()}"
+            os.write(fd, mine.encode())
             os.close(fd)
             break
         except FileExistsError:
-            stale_ino = _excl_stale(path)
-            if stale_ino is not None:
-                _break_stale(path, stale_ino)
+            stale = _excl_stale(path)
+            if stale is not None:
+                _break_stale(path, stale)
                 continue
             if time.monotonic() >= deadline:
                 raise AgentError("lock_timeout", f"{what} (lock {path})", exit_code=EXIT_TIMEOUT)
@@ -100,7 +112,7 @@ def _excl_lock(path, timeout, what):
     finally:
         try:
             # Only remove our own lock, never one a later holder created after a break.
-            if os.stat(path).st_ino == my_ino:
+            if _read_lock(path) == mine:
                 os.unlink(path)
         except OSError:
             pass

@@ -375,18 +375,20 @@ def test_lock_release_never_removes_a_successor_lock(tmp_path):
 
 def test_stale_lock_break_never_removes_a_fresh_lock(tmp_path):
     path = str(tmp_path / "x.lock.excl")
+    stale = f"999999999@{socket.gethostname()}#aa"
     with open(path, "w") as f:
-        f.write(f"999999999@{socket.gethostname()}")
-    stale_ino = os.stat(path).st_ino
-    # Another waiter already replaced it with a fresh lock (different inode).
+        f.write(stale)
+    assert locking._excl_stale(path) == stale
+    # Another waiter already replaced it with a fresh lock (Linux may even reuse the inode).
     os.unlink(path)
     with open(path, "w") as f:
-        f.write(f"{os.getpid()}@{socket.gethostname()}")
-    locking._break_stale(path, stale_ino)
+        f.write(f"{os.getpid()}@{socket.gethostname()}#bb")
+    assert locking._excl_stale(path) is None  # holder alive
+    locking._break_stale(path, stale)
     assert os.path.exists(path)
     with open(path) as f:
-        assert f.read().startswith(str(os.getpid()))
-    locking._break_stale(path, os.stat(path).st_ino)
+        assert f.read().endswith("#bb")
+    locking._break_stale(path, locking._read_lock(path))
     assert not os.path.exists(path)
 
 
