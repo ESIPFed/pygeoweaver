@@ -33,6 +33,9 @@ jobs:
           pip install pytest
 
       - name: Run tests
+        env:
+          # Also verify pinned JDK / H2 digests against the publishers' checksum files.
+          PYGEOWEAVER_NETWORK_TESTS: "1"
         run: |
           pytest -s .
 

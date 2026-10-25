@@ -2,12 +2,19 @@
 
 echo "Stop running Geoweaver if any.."
 pkill -f geoweaver.jar
-STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8070/Geoweaver")
-if [ $STATUS != 302 ]; then
+
+GEOWEAVER_PORT="${GEOWEAVER_PORT:-8070}"
+GEOWEAVER_URL="http://localhost:${GEOWEAVER_PORT}/Geoweaver"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" "$GEOWEAVER_URL")
+
+# Still answering with a normal front-door code means stop failed.
+case "$STATUS" in
+  200|301|302|303)
+    echo "Error: unable to stop (still HTTP ${STATUS} on ${GEOWEAVER_URL})."
+    exit 1
+    ;;
+  *)
     echo "Stopped."
     exit 0
-else
-    echo "Error: unable to stop."
-    exit 1
-fi
-
+    ;;
+esac

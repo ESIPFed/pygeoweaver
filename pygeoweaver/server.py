@@ -10,7 +10,8 @@ import psutil
 import requests
 from halo import Halo
 
-from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
+from pygeoweaver.agent.discovery import agent_child_env, is_geoweaver_jvm, open_private_log
+from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL, GEOWEAVER_PORT
 from pygeoweaver.h2_utils import (
     get_safe_datasource_url_for_start,
     maintain_h2_database_on_stop,
@@ -43,28 +44,47 @@ logger = get_logger(__name__)
 home_dir = os.path.expanduser("~")
 
 
-def check_geoweaver_status() -> bool:
+def is_geoweaver_http_ready(status_code) -> bool:
     """
-    Check if geoweaver is running
+    True when Geoweaver's HTTP front door answers.
+
+    Older releases redirected ``/Geoweaver`` with 302; Spring Boot 3 / Geoweaver
+    2.2+ often returns 200 (or 301/303). Open OnDemand readiness must accept all.
     """
     try:
-        # Run 'ps' command to list all processes
-        ps_output = subprocess.check_output(['ps', 'aux']).decode('utf-8').splitlines()
-        
-        # Check each line of ps output for 'geoweaver.jar'
-        geoweaver_running = False
-        for line in ps_output:
-            if 'geoweaver.jar' in line:
-                geoweaver_running = True
-                break
-        
+        code = int(status_code)
+    except (TypeError, ValueError):
+        return False
+    return code in (200, 301, 302, 303)
+
+
+def geoweaver_endpoint_url() -> str:
+    """``http://localhost:<GEOWEAVER_PORT>/Geoweaver`` (honors OOD ``export GEOWEAVER_PORT=$port``)."""
+    port = os.getenv("GEOWEAVER_PORT", str(GEOWEAVER_PORT))
+    return f"http://localhost:{port}/Geoweaver"
+
+
+def check_geoweaver_status() -> bool:
+    """
+    Check if the current user's Geoweaver is running.
+
+    Only JVMs owned by this user count: on shared login/compute nodes another
+    user's ``geoweaver.jar`` must not make ``gw start`` skip starting ours.
+    """
+    try:
+        if hasattr(os, "getuid"):
+            geoweaver_running = bool(find_geoweaver_processes(os.getuid()))
+        else:
+            ps_output = subprocess.check_output(['ps', 'aux']).decode('utf-8').splitlines()
+            geoweaver_running = any('geoweaver.jar' in line for line in ps_output)
+
         if geoweaver_running:
             logger.info("Geoweaver is running.")
             return True
         else:
             logger.info("Geoweaver is not running.")
             return False
-    
+
     except subprocess.CalledProcessError as e:
         err_msg = f"Error checking Geoweaver status: {e}"
         logger.error(err_msg)
@@ -95,12 +115,23 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
         # Pass datasource as a JVM system property — Geoweaver's picocli CLI
         # rejects Spring Boot `--spring.*` program arguments and exits.
         start_cmd = [java_cmd]
+        port = os.getenv("GEOWEAVER_PORT", str(GEOWEAVER_PORT))
+        start_cmd.append(f"-Dserver.port={port}")
         datasource_url = get_safe_datasource_url_for_start()
         if datasource_url:
             start_cmd.append(f"-Dspring.datasource.url={datasource_url}")
         start_cmd.extend(["-jar", geoweaver_jar])
         print(" ".join(start_cmd))
-        subprocess.Popen(start_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        env = agent_child_env(jvm=True)
+        env["GEOWEAVER_PORT"] = str(port)
+        subprocess.Popen(
+            start_cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+            env=env,
+            cwd=home_dir,  # never the caller's cwd: Spring Boot reads ./config/*.properties
+        )
 
         status = 0
         counter = 0
@@ -110,13 +141,13 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
             time.sleep(retry_delay)
             counter += 1
             try:
-                response = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL, allow_redirects=False)
-                if response.status_code == 302:
+                response = requests.get(geoweaver_endpoint_url(), allow_redirects=False, timeout=5)
+                if is_geoweaver_http_ready(response.status_code):
                     log_file = get_log_file_path()
                     # Now you can safely open the log file for reading
                     with open(log_file, "r") as f:
                         print(f.read())
-                    print("Success: Geoweaver is up")
+                    print(f"Success: Geoweaver is up (HTTP {response.status_code})")
                     if exit_on_finish:
                         safe_exit(0)
             except Exception as e:
@@ -181,15 +212,30 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
         # Pass datasource as a JVM system property — Geoweaver's picocli CLI
         # rejects Spring Boot `--spring.*` program arguments and exits.
         cmds = [java_path]
+        port = os.getenv("GEOWEAVER_PORT", str(GEOWEAVER_PORT))
+        cmds.append(f"-Dserver.port={port}")
         datasource_url = get_safe_datasource_url_for_start()
         if datasource_url:
             cmds.append(f"-Dspring.datasource.url={datasource_url}")
         cmds.extend(["-jar", os.path.expanduser("~/geoweaver.jar")])
         logger.info("Running %s", " ".join(cmds))
-        with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
-            subprocess.Popen(cmds, 
-                            stdout=log_file, 
-                            stderr=subprocess.STDOUT)
+        # No agent tokens in the JVM env: every process Geoweaver runs inherits it.
+        env = agent_child_env(jvm=True)
+        env["GEOWEAVER_PORT"] = str(port)
+        # 0600: run output lands here and home directories are often 0755 on clusters.
+        with open_private_log(os.path.expanduser("~/geoweaver.log"), "wb") as log_file:
+            # New session: an SSH/agent logout (SIGHUP) must not kill the server.
+            subprocess.Popen(
+                cmds,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                env=env,
+                # Never the caller's cwd (maybe an untrusted repo): Spring Boot reads
+                # ./application.properties and ./config/ from the working directory.
+                cwd=os.path.expanduser("~"),
+                start_new_session=True,
+            )
 
         # Wait for Geoweaver to start (Boot 3 / large jar needs more than ~20s on CI)
         time.sleep(2)
@@ -199,9 +245,11 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
         max_counter = 45  # ~90s plus initial sleep
         while counter != max_counter:  # max wait for cold start
             try:
-                status = requests.get(GEOWEAVER_DEFAULT_ENDPOINT_URL, allow_redirects=False, timeout=5).status_code
-                logger.debug(f"Received code {status}")
-                if status == 302 or status == 200:
+                status = requests.get(
+                    geoweaver_endpoint_url(), allow_redirects=False, timeout=5
+                ).status_code
+                logger.debug(f"Received code {status} from {geoweaver_endpoint_url()}")
+                if is_geoweaver_http_ready(status):
                     break
             except requests.exceptions.RequestException:
                 pass  # Connection error, retrying
@@ -210,6 +258,10 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
 
         if counter == max_counter:
             print("Error: Geoweaver is not up")
+            print(
+                "Hint (Open OnDemand): export GEOWEAVER_PORT=$port before `gw start` "
+                "so Geoweaver listens on the same port OOD put in connection.yml."
+            )
             log_path = os.path.expanduser("~/geoweaver.log")
             if os.path.isfile(log_path):
                 try:
@@ -221,7 +273,7 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
             if exit_on_finish:
                 safe_exit(1)
         else:
-            print("Success: Geoweaver is up")
+            print(f"Success: Geoweaver is up (HTTP {status})")
             if exit_on_finish:
                 safe_exit(0)
 
@@ -252,9 +304,7 @@ def find_geoweaver_processes(current_uid):
     processes = []
     for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'uids']):
         try:
-            if (proc.info and proc.info['cmdline'] and
-                ('geoweaver.jar' in " ".join(proc.info['cmdline']) or
-                 'GeoweaverApplication' in " ".join(proc.info['cmdline'])) and
+            if (proc.info and is_geoweaver_jvm(proc.info['cmdline']) and
                 proc.info['uids'] and proc.info['uids'].real == current_uid):
                 processes.append(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -315,20 +365,46 @@ def stop_on_mac_linux(
 
         # Check status of Geoweaver
         status = subprocess.run(
-            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}\n", GEOWEAVER_DEFAULT_ENDPOINT_URL],
+            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}\n", geoweaver_endpoint_url()],
             capture_output=True, text=True
         ).stdout.strip()
 
         logger.info("Geoweaver status: " + status)
-        if status != "302":
-            print("Stopped Geoweaver successfully.")
-            return 0
-        else:
+        if is_geoweaver_http_ready(status):
             print("Error: Unable to stop Geoweaver.")
             return 1
+        else:
+            print("Stopped Geoweaver successfully.")
+            return 0
 
 
 def start(force_download=False, force_restart=False, exit_on_finish=True):
+    """
+    Start Geoweaver. Holds the same per-user lock as ``gw agent ensure`` so an agent and a
+    human (or two agents) never boot two JVMs on one H2 database.
+    """
+    from pygeoweaver.agent.client import AgentError
+    from pygeoweaver.agent.locking import start_lock
+
+    if not force_restart and check_geoweaver_status():
+        print("Geoweaver is already running.")
+        if exit_on_finish:
+            safe_exit(0)
+        return
+    try:
+        # Same patience as an agent-started boot (slow JDK/jar downloads on clusters).
+        lock = start_lock(timeout=3600)
+        print("Acquiring the Geoweaver start lock (waits while another start is in progress; "
+              "see ~/.config/geoweaver-agent/ensure-start.log)...")
+        with lock:
+            _start_locked(force_download, force_restart, exit_on_finish)
+    except AgentError as e:
+        print(f"Error: {e.message}")
+        if exit_on_finish:
+            safe_exit(1)
+
+
+def _start_locked(force_download=False, force_restart=False, exit_on_finish=True):
     # Resolve Java / jar channel first so download picks latest vs legacy correctly.
     ensure_geoweaver_runtime()
     download_geoweaver_jar(overwrite=force_download)

@@ -2,45 +2,64 @@
 The main function of pygeoweaver
 To run in CLI mode. 
 """
+import importlib
 import logging
 import os
 import typing
 import click
 from pygeoweaver.version import __version__
-from pygeoweaver import (
-    detail_host,
-    detail_process,
-    detail_workflow,
-    export_workflow,
-    show_history,
-    import_workflow,
-    list_hosts,
-    list_processes,
-    list_workflows,
-    start,
-    stop,
-    reset_password,
-    run_process,
-    run_workflow,
-    helpwith,
-    clean_h2db,
-)
-from pygeoweaver.commands.pgw_cleanup import cleanup_workspace
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL
-from pygeoweaver.commands.pgw_create import create_process, create_process_from_file, create_workflow
-from pygeoweaver.commands.pgw_detail import get_process_code
-from pygeoweaver.commands.pgw_find import get_process_by_id, get_process_by_language, get_process_by_name
-from pygeoweaver.commands.pgw_history import get_process_history, get_workflow_history
-from pygeoweaver.commands.pgw_list import list_processes_in_workflow
-from pygeoweaver.commands.pgw_sync import sync, sync_workflow
-from pygeoweaver.commands.pgw_upgrade import upgrade_geoweaver
-from pygeoweaver.commands.pgw_status import show_geoweaver_status
-from pygeoweaver.commands.pgw_cleanh2backups import clean_h2_backups_command
 from pygeoweaver.pgw_log_config import setup_logging
-from pygeoweaver.server import show
-from halo import Halo
-from pygeoweaver.utils import get_spinner
-import tempfile
+
+
+def _lazy(module, name):
+    """Import a command implementation on first call so `gw` starts in milliseconds."""
+    def call(*args, **kwargs):
+        return getattr(importlib.import_module(module), name)(*args, **kwargs)
+    call.__name__ = call.__qualname__ = name
+    call.__doc__ = f"Lazily imported {module}.{name}; see that function for details."
+    return call
+
+
+_C = "pygeoweaver.commands."
+detail_host = _lazy(_C + "pgw_detail", "detail_host")
+detail_process = _lazy(_C + "pgw_detail", "detail_process")
+detail_workflow = _lazy(_C + "pgw_detail", "detail_workflow")
+get_process_code = _lazy(_C + "pgw_detail", "get_process_code")
+export_workflow = _lazy(_C + "pgw_export", "export_workflow")
+show_history = _lazy(_C + "pgw_history", "show_history")
+get_process_history = _lazy(_C + "pgw_history", "get_process_history")
+get_workflow_history = _lazy(_C + "pgw_history", "get_workflow_history")
+import_workflow = _lazy(_C + "pgw_import", "import_workflow")
+list_hosts = _lazy(_C + "pgw_list", "list_hosts")
+list_processes = _lazy(_C + "pgw_list", "list_processes")
+list_workflows = _lazy(_C + "pgw_list", "list_workflows")
+list_processes_in_workflow = _lazy(_C + "pgw_list", "list_processes_in_workflow")
+start = _lazy("pygeoweaver.server", "start")
+stop = _lazy("pygeoweaver.server", "stop")
+show = _lazy("pygeoweaver.server", "show")
+reset_password = _lazy(_C + "pgw_resetpassword", "reset_password")
+run_process = _lazy(_C + "pgw_run", "run_process")
+run_workflow = _lazy(_C + "pgw_run", "run_workflow")
+helpwith = _lazy(_C + "pgw_help", "helpwith")
+clean_h2db = _lazy(_C + "pgw_cleanh2db", "clean_h2db")
+cleanup_workspace = _lazy(_C + "pgw_cleanup", "cleanup_workspace")
+create_process = _lazy(_C + "pgw_create", "create_process")
+create_process_from_file = _lazy(_C + "pgw_create", "create_process_from_file")
+create_workflow = _lazy(_C + "pgw_create", "create_workflow")
+get_process_by_id = _lazy(_C + "pgw_find", "get_process_by_id")
+get_process_by_language = _lazy(_C + "pgw_find", "get_process_by_language")
+get_process_by_name = _lazy(_C + "pgw_find", "get_process_by_name")
+sync = _lazy(_C + "pgw_sync", "sync")
+sync_workflow = _lazy(_C + "pgw_sync", "sync_workflow")
+upgrade_geoweaver = _lazy(_C + "pgw_upgrade", "upgrade_geoweaver")
+show_geoweaver_status = _lazy(_C + "pgw_status", "show_geoweaver_status")
+clean_h2_backups_command = _lazy(_C + "pgw_cleanh2backups", "clean_h2_backups_command")
+
+
+def get_spinner(*args, **kwargs):
+    from pygeoweaver.utils import get_spinner as _get_spinner
+    return _get_spinner(*args, **kwargs)
 
 
 setup_logging()
@@ -53,6 +72,11 @@ def geoweaver():
     Geoweaver CLI: A tool for managing workflows and processes.
     """
     pass
+
+
+from pygeoweaver.agent.cli import agent as _agent_group  # noqa: E402
+
+geoweaver.add_command(_agent_group)
 
 
 @geoweaver.command("start")
@@ -656,8 +680,6 @@ def upgrade_command(force, no_start):
     else:
         click.echo(click.style("Geoweaver upgrade failed. Check $HOME/geoweaver/logs for details.", fg='red', bold=True))
 
-
-from pygeoweaver.commands.pgw_cleanup import cleanup_workspace
 
 @geoweaver.command("installjdk")
 @click.option('--install-dir', help='Custom installation directory for JDK', type=str)

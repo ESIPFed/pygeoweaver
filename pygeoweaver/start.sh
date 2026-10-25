@@ -3,6 +3,18 @@
 echo "Stop running Geoweaver if any.."
 pkill -f geoweaver.jar 2>/dev/null || true
 
+# Open OnDemand sets GEOWEAVER_PORT=$port so connection.yml matches the JVM bind.
+GEOWEAVER_PORT="${GEOWEAVER_PORT:-8070}"
+GEOWEAVER_URL="http://localhost:${GEOWEAVER_PORT}/Geoweaver"
+echo "Using GEOWEAVER_PORT=${GEOWEAVER_PORT}"
+
+is_ready_http() {
+  case "$1" in
+    200|301|302|303) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 echo "Checking Java / Geoweaver jar channel..."
 
 # Prefer the Python runtime resolver (bumps managed ~/jdk to 17, or
@@ -68,22 +80,25 @@ else
 fi
 
 echo "Start Geoweaver.."
-nohup "$JAVA_BIN" -jar ~/geoweaver.jar > ~/geoweaver.log &
+# Export so Spring Boot picks up server.port=${GEOWEAVER_PORT:8070}
+export GEOWEAVER_PORT
+nohup "$JAVA_BIN" -Dserver.port="${GEOWEAVER_PORT}" -jar ~/geoweaver.jar > ~/geoweaver.log &
 
 STATUS=0
 counter=0
-until [ "$STATUS" = "302" ] || [ "$counter" = "20" ]
+until is_ready_http "$STATUS" || [ "$counter" = "45" ]
 do
     sleep 2
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:8070/Geoweaver")
+    STATUS=$(curl -s -o /dev/null -w "%{http_code}\n" "$GEOWEAVER_URL")
     ((counter++))
 done
 
 cat ~/geoweaver.log
 
-if [ "$STATUS" = "302" ]; then
-    echo "Success: Geoweaver is up"
+if is_ready_http "$STATUS"; then
+    echo "Success: Geoweaver is up (HTTP ${STATUS} on port ${GEOWEAVER_PORT})"
 else
-    echo "Error: Geoweaver is not up"
+    echo "Error: Geoweaver is not up on ${GEOWEAVER_URL}"
+    echo "Hint (Open OnDemand): export GEOWEAVER_PORT=\$port before gw start"
     exit 1
 fi
