@@ -23,12 +23,14 @@ from pygeoweaver.agent.client import (
     is_loopback_url,
 )
 from pygeoweaver.agent.discovery import (
+    agent_child_env,
     foreign_port_error,
     is_foreign_loopback,
-    config_dir,
     discover_local_servers,
     local_base_url,
+    open_private_log,
     own_geoweaver_processes,
+    private_config_dir,
 )
 from pygeoweaver.agent.locking import start_lock
 
@@ -106,18 +108,24 @@ def _child_start():
 
 
 def _spawn_start(port, log_path, allow_second_server=False):
-    """Start Geoweaver from a child so its prints never pollute the caller's JSON stdout."""
-    env = os.environ.copy()
+    """
+    Start Geoweaver from a child so its prints never pollute the caller's JSON stdout.
+
+    ``python -m`` puts the working directory first on ``sys.path``; the agent's cwd may be
+    an untrusted checkout, so the child runs in the private config dir instead.
+    """
+    env = agent_child_env()
     env["GEOWEAVER_PORT"] = str(port)
     if allow_second_server:
         env[ALLOW_SECOND_ENV] = "1"
-    with open(log_path, "ab") as log:
+    with open_private_log(log_path) as log:
         return subprocess.Popen(
             [sys.executable, "-m", "pygeoweaver.agent.ensure"],
             stdout=log,
             stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
             env=env,
+            cwd=private_config_dir(),
             start_new_session=True,
         )
 
@@ -205,7 +213,7 @@ def ensure_server(base_url, timeout=240.0, start=True, allow_second_server=False
             raise AgentError("unreachable", f"Geoweaver is not running at {base_url}",
                              exit_code=EXIT_UNREACHABLE)
 
-        log_path = os.path.join(config_dir(), "ensure-start.log")
+        log_path = os.path.join(private_config_dir(), "ensure-start.log")
         child = _spawn_start(port, log_path, allow_second_server)
     # The child takes the start lock itself and holds it until its JVM is launched, so the
     # lock outlives this caller's timeout (slow JDK/jar downloads on clusters).

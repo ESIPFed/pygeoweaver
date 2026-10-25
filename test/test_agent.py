@@ -147,7 +147,7 @@ def test_client_crud_and_auth_headers(server):
     assert created["id"] == "pnew" and created["code"] == "print(42)"
     headers = _Stub.calls[-1][3]
     assert headers["Authorization"] == f"Bearer {TOKEN}"
-    assert headers["X-Geoweaver-Agent-Token"] == TOKEN  # survives proxies that strip Authorization
+    assert "X-Geoweaver-Agent-Token" not in headers  # only sent with an OOD cookie jar
 
 
 def test_client_error_mapping(server):
@@ -355,7 +355,7 @@ def test_cli_errors_are_json_with_exit_codes(server):
 
 
 def test_cli_run_wait_and_workflow_chain(server):
-    r = _cli("--base-url", server, "process", "run", "p1", "--wait", "--interval", "0.01",
+    r = _cli("--base-url", server, "process", "run", "p1", "--wait", "--interval", "0.25",
              token=TOKEN)
     assert r.exit_code == 0 and json.loads(r.output)["status"] == "Done"
     r = _cli("--base-url", server, "workflow", "create", "--name", "w", "--chain", "p1,p2",
@@ -523,8 +523,10 @@ def test_login_refuses_foreign_default_port(server):
             patch.object(discovery, "discover_local_servers", return_value=[]):
         r = _cli("login", "--password-stdin", input="pw\n")
         assert r.exit_code == client_mod.EXIT_FOREIGN
-        # explicit URL is the user's informed choice (e.g. Docker)
-        r = _cli("login", "--password-stdin", "--base-url", server, input="pw\n")
+        # explicit URL is the user's informed choice (e.g. Docker), token goes to a 0600 file
+        tf = os.path.join(os.path.dirname(os.environ["GEOWEAVER_AGENT_CONFIG_DIR"]), "d.token")
+        r = _cli("login", "--password-stdin", "--base-url", server, "--token-file", tf,
+                 input="pw\n")
         assert r.exit_code == 0
     assert sum(1 for c in _Stub.calls if c[1] == "/tokens") == 1
 
@@ -575,13 +577,20 @@ def test_wait_up_keeps_waiting_when_child_exits_but_jvm_boots():
 
 # ----------------------------------------------------------------------------- review round 4
 
-def test_login_on_foreign_listener_returns_token_without_storing(server):
-    """MEDIUM-070: never store (or make loopback-latest) a token for someone else's listener."""
+def test_login_on_foreign_listener_writes_token_file_without_storing(server, tmp_path):
+    """MEDIUM-070 / SEC-004: never store or print a token for someone else's listener."""
     discovery.save_token("http://127.0.0.1:9/Geoweaver", {"token": "mine", "fingerprint": "m"})
+    tf = tmp_path / "foreign.token"
     with patch.object(discovery, "loopback_port_owner", return_value="other"):
         r = _cli("login", "--password-stdin", "--base-url", server, input="pw\n")
+        assert r.exit_code == client_mod.EXIT_USAGE and TOKEN not in r.output
+        assert not any(c[1] == "/tokens" for c in _Stub.calls)  # password never sent
+        r = _cli("login", "--password-stdin", "--base-url", server, "--token-file", str(tf),
+                 input="pw\n")
     out = json.loads(r.output)
-    assert r.exit_code == 0 and out["stored"] is None and out["token"] == TOKEN
+    assert r.exit_code == 0 and out["stored"] is None and "token" not in out
+    assert TOKEN not in r.output
+    assert tf.read_text().strip() == TOKEN and stat.S_IMODE(tf.stat().st_mode) == 0o600
     assert discovery.resolve_token("http://127.0.0.1:12345/Geoweaver") == ("mine", "store:loopback-latest")
     assert discovery.resolve_token(server)[0] == "mine"  # only via loopback-latest, not stored
 

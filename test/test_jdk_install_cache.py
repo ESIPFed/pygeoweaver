@@ -48,10 +48,10 @@ def test_download_jdk_archive_replaces_stale_jdk11(tmp_path):
     archive = tmp_path / "jdk.tar.gz"
     _make_tar(archive, "jdk-11.0.18+10")
 
-    def fake_retrieve(url, filename):
+    def fake_fetch(url, filename):
         _make_tar(Path(filename), "jdk-17.0.13+11")
 
-    with patch("pygeoweaver.jdk_utils.urllib.request.urlretrieve", side_effect=fake_retrieve):
+    with patch("pygeoweaver.jdk_utils._fetch", side_effect=fake_fetch):
         download_jdk_archive("https://example.invalid/jdk17.tar.gz", str(archive), "17.0.13-11")
 
     assert archive_matches_jdk_version(str(archive), "17.0.13-11")
@@ -65,7 +65,7 @@ def test_download_jdk_archive_keeps_matching_cache(tmp_path):
     _make_tar(archive, "jdk-17.0.13+11")
     mtime_before = archive.stat().st_mtime
 
-    with patch("pygeoweaver.jdk_utils.urllib.request.urlretrieve") as retrieve:
+    with patch("pygeoweaver.jdk_utils._fetch") as retrieve:
         download_jdk_archive("https://example.invalid/jdk17.tar.gz", str(archive), "17.0.13-11")
         retrieve.assert_not_called()
 

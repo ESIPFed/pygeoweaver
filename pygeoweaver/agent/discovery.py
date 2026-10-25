@@ -11,11 +11,20 @@ written by Geoweaver's ``gw-ood-login`` (only for the base URL it was minted for
 import json
 import os
 import re
+import socket
+import stat
 import time
 
 import urllib.parse
 
-from pygeoweaver.agent.client import EXIT_FOREIGN, AgentClient, AgentError, is_loopback_url
+from pygeoweaver.agent.client import (
+    EXIT_ERROR,
+    EXIT_FOREIGN,
+    EXIT_USAGE,
+    AgentClient,
+    AgentError,
+    is_loopback_url,
+)
 
 DEFAULT_PORT = "8070"
 _LOOPBACK_LATEST = "loopback:latest"
@@ -28,15 +37,76 @@ def config_dir():
 
 
 def _ensure_private_dir(path):
+    """
+    Create ``path`` 0700, or accept an existing one only if it is owned by this user and
+    not writable by group/other (else tokens and locks could be read or swapped by another
+    account). Fails closed.
+    """
     os.makedirs(path, mode=0o700, exist_ok=True)
+    if not hasattr(os, "getuid"):  # Windows: per-user profile ACLs
+        return
+    st = os.stat(path)
+    if st.st_uid != os.getuid():
+        raise AgentError("insecure_config_dir",
+                         f"{path} is owned by another account; refusing to keep tokens there. "
+                         "Set GEOWEAVER_AGENT_CONFIG_DIR to a directory you own.",
+                         exit_code=EXIT_ERROR)
+    if stat.S_IMODE(st.st_mode) & 0o077:
+        try:
+            os.chmod(path, 0o700)
+        except OSError:
+            raise AgentError("insecure_config_dir",
+                             f"{path} is accessible by other accounts and cannot be chmod 700",
+                             exit_code=EXIT_ERROR) from None
+
+
+def private_config_dir():
+    path = config_dir()
+    _ensure_private_dir(path)
+    return path
+
+
+def open_private_log(path, mode="ab"):
+    """Open a log file readable only by this user (``~`` is often 0755 on clusters)."""
+    flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if "a" in mode else 0)
+    fd = os.open(path, flags, 0o600)  # a symlink (e.g. to scratch) is fine if the file is ours
     try:
-        os.chmod(path, 0o700)
-    except OSError:
+        if hasattr(os, "getuid") and os.fstat(fd).st_uid != os.getuid():
+            raise AgentError("insecure_log", f"{path} is owned by another account",
+                             exit_code=EXIT_ERROR)
+        if "a" not in mode:
+            os.ftruncate(fd, 0)  # only after the ownership check
+        os.fchmod(fd, 0o600)
+    except AgentError:
+        os.close(fd)
+        raise
+    except (AttributeError, OSError):
         pass
+    return os.fdopen(fd, mode)
+
+
+# Agent credentials / switches that must not leak into the Geoweaver JVM (and from there
+# into every process it runs) or into the start helper.
+SECRET_ENV = ("GEOWEAVER_API_TOKEN", "GEOWEAVER_OOD_COOKIE_JAR", "GEOWEAVER_AGENT_INSECURE",
+              "GEOWEAVER_AGENT_ALLOW_FOREIGN")
+
+
+def agent_child_env(jvm=False):
+    env = {k: v for k, v in os.environ.items() if k not in SECRET_ENV}
+    if jvm:
+        env = {k: v for k, v in env.items() if not k.startswith("GEOWEAVER_AGENT_")}
+    return env
+
+
+def validate_port(port):
+    port = str(port).strip()
+    if not port.isdigit() or not 0 < int(port) < 65536:
+        raise AgentError("bad_port", f"Invalid port {port[:20]!r}", exit_code=EXIT_USAGE)
+    return port
 
 
 def local_base_url(port):
-    return f"http://127.0.0.1:{port}/Geoweaver"
+    return f"http://127.0.0.1:{validate_port(port)}/Geoweaver"
 
 
 # --------------------------------------------------------------------------- processes
@@ -83,28 +153,33 @@ def own_geoweaver_processes():
     return found
 
 
-def _listen_ports(proc):
-    ports = []
+def _proc_listen_ports(proc):
+    """Ports ``proc`` really LISTENs on where 127.0.0.1 reaches it (None if the OS will not say)."""
     try:
         conns = proc.net_connections(kind="tcp") if hasattr(proc, "net_connections") \
             else proc.connections(kind="tcp")
-        for c in conns:
-            if c.status == "LISTEN" and c.laddr:
-                ports.append(str(c.laddr.port))
+    except Exception:
+        return None
+    return [str(c.laddr.port) for c in conns if c.status == "LISTEN" and c.laddr
+            and _reaches(c.laddr, str(c.laddr.port), "127.0.0.1")]
+
+
+def _listen_ports(proc):
+    """``(ports, verified)``: real listening sockets, else ``-Dserver.port`` (booting JVM,
+    or socket introspection denied). Only verified ports count as "mine" for secrets."""
+    ports = _proc_listen_ports(proc)
+    if ports:
+        return ports, True
+    try:
+        m = re.search(r"-Dserver\.port=(\d+)", " ".join(proc.cmdline()))
+        if m:
+            return [m.group(1)], False
     except Exception:
         pass
-    if not ports:
-        # macOS may deny socket introspection; fall back to -Dserver.port in the command line.
-        try:
-            m = re.search(r"-Dserver\.port=(\d+)", " ".join(proc.cmdline()))
-            if m:
-                ports.append(m.group(1))
-        except Exception:
-            pass
-    return ports
+    return [], False
 
 
-_SCAN_CACHE = {"at": 0.0, "value": None}
+_SCAN_CACHE = {"at": 0.0, "value": None, "verified": frozenset()}
 
 
 def discover_local_servers(max_age=2.0):
@@ -115,48 +190,117 @@ def discover_local_servers(max_age=2.0):
         return _SCAN_CACHE["value"]
     procs = sorted(own_geoweaver_processes(),
                    key=lambda p: p.info.get("create_time") or 0, reverse=True)
-    out = []
+    out, verified = [], set()
     for proc in procs:
-        for port in _listen_ports(proc):
+        ports, ok = _listen_ports(proc)
+        for port in ports:
             out.append((proc.pid, port))
-    _SCAN_CACHE.update(at=now, value=out)
+            if ok:
+                verified.add(port)
+    _SCAN_CACHE.update(at=now, value=out, verified=frozenset(verified))
     return out
 
 
-def loopback_port_owner(port):
+def _verified_own_ports():
+    discover_local_servers()
+    return _SCAN_CACHE["verified"]
+
+
+_IPV4_REACH = ("127.0.0.1", "0.0.0.0", "::", "::ffff:127.0.0.1", "", "*")
+_IPV6_REACH = ("::1", "::", "")
+
+
+def _reaches(laddr, port, host):
+    """Would a connection to ``host:port`` land on a socket listening on ``laddr``?"""
+    if not laddr or str(laddr.port) != port:
+        return False
+    ip = laddr.ip.split("%")[0]
+    if host == "::1":
+        return ip in _IPV6_REACH
+    return ip in _IPV4_REACH  # exact address or wildcard; 127.0.0.2 is a different socket
+
+
+def _current_user(psutil):
+    try:
+        return psutil.Process().username()
+    except Exception:
+        return None
+
+
+def _is_mine(proc, psutil, me_user=None):
+    """Owned by this account: real uid on POSIX, user name elsewhere (Windows); unknown → no."""
+    try:
+        if hasattr(os, "getuid"):
+            return proc.uids().real == os.getuid()
+        return me_user is not None and proc.username() == me_user
+    except Exception:
+        return False
+
+
+def _own_process_listens(port, host, psutil):
+    """Scan only this user's processes (works without root on macOS, unlike the global table)."""
+    me_user = _current_user(psutil)
+    for proc in psutil.process_iter():
+        try:
+            if not _is_mine(proc, psutil, me_user):
+                continue
+            conns = proc.net_connections(kind="tcp") if hasattr(proc, "net_connections") \
+                else proc.connections(kind="tcp")
+            if any(c.status == "LISTEN" and _reaches(c.laddr, port, host) for c in conns):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _something_listens(host, port):
+    try:
+        with socket.create_connection((host, int(port)), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def loopback_port_owner(port, host="127.0.0.1"):
     """
-    Who listens on loopback ``port``: ``"me"``, ``"other"`` (another account), or ``None``
-    (nothing listening, or the OS will not say — e.g. macOS without root).
+    Who listens on loopback ``port``: ``"me"`` (a verified listening socket of one of your
+    processes), ``"other"`` (another account, root, docker-proxy, ...), ``"none"`` (nothing
+    listens) or ``None`` (cannot tell; callers treat it like ``"other"``).
 
     ``/api/v1/health`` is public, so on a shared login/compute node it cannot tell your
     Geoweaver from a colleague's; this check keeps your token away from theirs.
     """
     port = str(port)
-    if any(p == port for _pid, p in discover_local_servers()):
-        return "me"
+    if host != "::1" and port in _verified_own_ports():
+        return "me"  # fast path: our own Geoweaver JVM listens there (checked socket)
     try:
         import psutil
-
+    except ImportError:
+        return None
+    try:
         conns = psutil.net_connections(kind="tcp")
     except Exception:
-        return None
-    me = os.getuid() if hasattr(os, "getuid") else None
-    listeners = [c for c in conns if c.status == "LISTEN" and c.laddr
-                 and str(c.laddr.port) == port]
+        conns = None  # macOS without root: only our own processes can be inspected
+    if conns is None:
+        if not _something_listens(host, port):
+            return "none"
+        return "me" if _own_process_listens(port, host, psutil) else "other"
+    listeners = [c for c in conns if c.status == "LISTEN" and _reaches(c.laddr, port, host)]
     if not listeners:
-        return None
+        return "none"
+    # Every socket the connection could reach must be ours (an IPv4 and an IPv6 listener on
+    # the same port may belong to different accounts).
+    me_user = _current_user(psutil)
     for c in listeners:
+        # Unprivileged Linux reports pid=None only for sockets of other accounts.
         if c.pid is None:
-            continue
-        if me is None:
-            return "me"
+            return "other"
         try:
-            if psutil.Process(c.pid).uids().real == me:
-                return "me"
+            if not _is_mine(psutil.Process(c.pid), psutil, me_user):
+                return "other"
         except Exception:
-            continue
-    # Unprivileged Linux reports pid=None only for sockets of other accounts.
-    return "other" if all(c.pid is None for c in listeners) else None
+            return None
+    return "me"
 
 
 ALLOW_FOREIGN_ENV = "GEOWEAVER_AGENT_ALLOW_FOREIGN"
@@ -175,11 +319,15 @@ def foreign_port_error(port):
 
 
 def is_foreign_loopback(base_url):
-    """True when ``base_url`` is a loopback port held by another account (see above)."""
+    """
+    True when ``base_url`` is a loopback port held by another account, or by a listener whose
+    owner cannot be determined (fail closed). False when nothing listens.
+    """
     if not is_loopback_url(base_url) or os.getenv(ALLOW_FOREIGN_ENV) == "1":
         return False
-    port = urllib.parse.urlsplit(base_url).port
-    return bool(port) and loopback_port_owner(port) == "other"
+    parts = urllib.parse.urlsplit(normalize_loopback(base_url))
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    return loopback_port_owner(port, parts.hostname) not in ("me", "none")
 
 
 def check_not_foreign(base_url):
@@ -188,16 +336,26 @@ def check_not_foreign(base_url):
         raise foreign_port_error(urllib.parse.urlsplit(base_url).port)
 
 
+def normalize_loopback(base_url):
+    """``localhost`` → ``127.0.0.1``: one address that both the ownership check and the request
+    use (``localhost`` may resolve to ``::1`` first, where someone else could listen)."""
+    parts = urllib.parse.urlsplit(base_url)
+    if (parts.hostname or "").lower() == "localhost":
+        netloc = "127.0.0.1" + (f":{parts.port}" if parts.port else "")
+        return urllib.parse.urlunsplit(parts._replace(netloc=netloc))
+    return base_url
+
+
 def resolve_base_url(explicit=None, probe=True):
     """Return ``(base_url, source)``."""
     if explicit:
-        return explicit.rstrip("/"), "argument"
+        return normalize_loopback(explicit.rstrip("/")), "argument"
     env_url = os.getenv("GEOWEAVER_BASE_URL")
     if env_url:
-        return env_url.rstrip("/"), "GEOWEAVER_BASE_URL"
+        return normalize_loopback(env_url.rstrip("/")), "GEOWEAVER_BASE_URL"
     env_port = os.getenv("GEOWEAVER_PORT")
     if env_port:
-        return local_base_url(env_port), "GEOWEAVER_PORT"
+        return local_base_url(env_port), "GEOWEAVER_PORT"  # validated: digits only
     candidates = discover_local_servers()
     if not probe:
         if candidates:
@@ -235,22 +393,45 @@ def _store_key(base_url):
 
 
 def _read_store():
+    path = _store_path()
     try:
-        with open(_store_path(), "r", encoding="utf-8") as f:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except OSError:
+        return {}
+    try:
+        if hasattr(os, "getuid"):
+            st = os.fstat(fd)
+            if st.st_uid != os.getuid():
+                return {}  # never trust (or send) tokens from a file another account owns
+            if stat.S_IMODE(st.st_mode) & 0o077:
+                os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "r", encoding="utf-8") as f:
+            fd = None
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def _write_store(data):
     _ensure_private_dir(config_dir())
     path = _store_path()
-    tmp = f"{path}.{os.getpid()}.tmp"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, path)
+    tmp = f"{path}.{os.getpid()}.{os.urandom(4).hex()}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _store_lock():
@@ -351,8 +532,9 @@ def connect(base_url=None, token=None, timeout=30.0, probe=True, sends_password=
     tok, tok_source = resolve_token(url, token)
     info = {"baseUrl": url, "baseUrlSource": url_source, "tokenSource": tok_source}
     secret = sends_password or bool(tok)
-    # A discovered URL is one of our own JVMs by construction; check everything else.
-    if secret and url_source != "discovered" and is_foreign_loopback(url):
+    # Discovered URLs are checked too: a JVM that has not bound its port yet is "discovered"
+    # from -Dserver.port while another account may still hold that port.
+    if secret and is_foreign_loopback(url):
         explicit = url_source in EXPLICIT_URL_SOURCES and (
             sends_password or tok_source in EXPLICIT_TOKEN_SOURCES)
         if not explicit:

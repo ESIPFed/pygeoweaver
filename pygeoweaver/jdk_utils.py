@@ -1,3 +1,4 @@
+import hashlib
 import platform
 import os
 import subprocess
@@ -6,6 +7,7 @@ import sys
 import tarfile
 import time
 import zipfile
+import urllib.parse
 import urllib.request
 
 import click
@@ -314,9 +316,63 @@ def archive_matches_jdk_version(archive_path, jdk_version):
     return False
 
 
-def download_file(url, filename, force=False):
+# SHA-256 of the pinned Temurin archives (from Adoptium's *.sha256.txt release files).
+# Update together with GEOWEAVER_MANAGED_JDK17_VERSION; a missing entry fails closed.
+TEMURIN_SHA256 = {
+    "OpenJDK17U-jdk_x64_mac_hotspot_17.0.13_11.tar.gz":
+        "840535070200a944a6b582d258ee84608bd25c9f2b5d1cdddb58dfadb019675a",
+    "OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.13_11.tar.gz":
+        "d8b2f77f755d06e81a540834c5be22ed86f3c8a51a20396606c074303f8f9e2d",
+    "OpenJDK17U-jdk_x64_linux_hotspot_17.0.13_11.tar.gz":
+        "8682892fc02965930b9022c066fa164dd6f458ef4a5dc262016aa28333b30f49",
+    "OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.13_11.tar.gz":
+        "0c17fa4f14c0d2cc9e9334f996fccdddc5da4459d768f3105c7ff0283c47bf62",
+    "OpenJDK17U-jdk_x64_windows_hotspot_17.0.13_11.zip":
+        "6b64255e1bd690b09a135d44ac6b0d6bd4490728a8bad81904941d2789d394c0",
+    "OpenJDK17U-jdk_x86-32_windows_hotspot_17.0.13_11.zip":
+        "04874767c1c82f0aee20fd558770fbf2e7aca7c3c19e1df0a8dd3d0ab4b668a2",
+}
+
+DOWNLOAD_TIMEOUT = 60  # seconds without data; downloads run under the Geoweaver start lock
+DOWNLOAD_DEADLINE = 1800  # seconds for a whole download (a slow drip must not hold the lock)
+
+
+def copy_with_deadline(chunks, out, url, deadline_s=DOWNLOAD_DEADLINE):
+    deadline = time.monotonic() + deadline_s
+    for chunk in chunks:
+        out.write(chunk)
+        if time.monotonic() > deadline:
+            raise RuntimeError(f"Download of {url} took longer than {deadline_s}s")
+
+
+def pinned_jdk_sha256(url):
+    name = os.path.basename(urllib.parse.urlsplit(url).path)
+    digest = TEMURIN_SHA256.get(name)
+    if not digest:
+        raise RuntimeError(f"No pinned SHA-256 for {name}; refusing to install an unverified JDK.")
+    return digest
+
+
+def file_sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _fetch(url, dest):
+    """Stream ``url`` to ``dest`` (https only, with a timeout)."""
+    if urllib.parse.urlsplit(url).scheme != "https":
+        raise RuntimeError(f"Refusing non-https download: {url}")
+    with urllib.request.urlopen(url, timeout=DOWNLOAD_TIMEOUT) as resp, open(dest, "wb") as out:
+        copy_with_deadline(iter(lambda: resp.read(1 << 20), b""), out, url)
+
+
+def download_file(url, filename, force=False, sha256=None):
     """
-    Download ``url`` to ``filename``.
+    Download ``url`` to ``filename`` atomically (temp file + rename), optionally verifying
+    ``sha256``; a partial or tampered download never takes the final name.
 
     When ``force`` is True, replace any existing file (after moving it aside).
     """
@@ -330,19 +386,34 @@ def download_file(url, filename, force=False):
         except OSError:
             os.remove(filename)
     print(f"Downloading {filename}...", url)
-    urllib.request.urlretrieve(url, filename)
+    part = f"{filename}.{os.getpid()}.part"
+    try:
+        _fetch(url, part)
+        if sha256:
+            actual = file_sha256(part)
+            if actual != sha256:
+                raise RuntimeError(f"SHA-256 mismatch for {url}: expected {sha256}, got {actual}")
+        os.replace(part, filename)
+    finally:
+        if os.path.exists(part):
+            os.remove(part)
     print(f"{filename} downloaded.")
 
 
-def download_jdk_archive(url, filename, jdk_version):
+def download_jdk_archive(url, filename, jdk_version, sha256=None):
     """
-    Ensure ``filename`` holds the Temurin archive for ``jdk_version``.
+    Ensure ``filename`` holds the Temurin archive for ``jdk_version`` (and, when given,
+    exactly the bytes with digest ``sha256``; a cached archive is re-verified).
 
     A leftover ``~/jdk.tar.gz`` from an older Java 11 install must not be reused:
     extracting it again over ``~/jdk/jdk-11*`` causes PermissionError on locked files.
     """
     if os.path.isfile(filename) and archive_matches_jdk_version(filename, jdk_version):
-        print(f"{filename} already exists and matches JDK {jdk_version}.")
+        if sha256 is None or file_sha256(filename) == sha256:
+            print(f"{filename} already exists and matches JDK {jdk_version}.")
+            return
+        print(f"{filename} does not match the pinned SHA-256. Downloading a fresh copy...")
+        download_file(url, filename, force=True, sha256=sha256)
         return
     if os.path.isfile(filename):
         top = archive_top_level_name(filename)
@@ -351,9 +422,9 @@ def download_jdk_archive(url, filename, jdk_version):
             f"(archive top-level: {top!r}; need {managed_jdk_dir_name(jdk_version)!r}). "
             "Downloading a fresh copy..."
         )
-        download_file(url, filename, force=True)
+        download_file(url, filename, force=True, sha256=sha256)
         return
-    download_file(url, filename, force=False)
+    download_file(url, filename, force=False, sha256=sha256)
 
 
 def prepare_managed_jdk_root(jdk_install_dir, jdk_version):
@@ -390,13 +461,48 @@ def prepare_managed_jdk_root(jdk_install_dir, jdk_version):
             ) from exc
 
 
+def _safe_extractall(tar_ref, destination_dir):
+    """Refuse members that escape ``destination_dir`` (absolute, ``..``, links outside)."""
+    if hasattr(tarfile, "data_filter"):
+        tar_ref.extractall(destination_dir, filter="data")
+        return
+    # Older Pythons: extract one member at a time and resolve every path against the tree
+    # as it exists on disk, so a chain of links (d -> ., d/e -> ..) cannot walk out.
+    os.makedirs(destination_dir, exist_ok=True)
+    root = os.path.realpath(destination_dir)
+
+    def inside(path):
+        return path == root or path.startswith(root + os.sep)
+
+    for member in tar_ref.getmembers():
+        if member.isdev():
+            raise RuntimeError(f"Device file in archive: {member.name}")
+        name = member.name
+        if os.path.isabs(name) or name.startswith(("/", "\\")) or os.path.splitdrive(name)[0]:
+            raise RuntimeError(f"Absolute path in archive: {member.name}")
+        parent = os.path.realpath(os.path.join(root, os.path.dirname(name)))
+        target = os.path.join(parent, os.path.basename(name))
+        if not inside(parent) or not inside(os.path.realpath(target)):
+            raise RuntimeError(f"Unsafe path in archive: {member.name}")
+        if member.issym():
+            link = os.path.realpath(os.path.join(parent, member.linkname))
+        elif member.islnk():
+            link = os.path.realpath(os.path.join(root, member.linkname))
+        else:
+            link = root
+        if os.path.isabs(member.linkname or "") or not inside(link):
+            raise RuntimeError(f"Unsafe link in archive: {member.name}")
+        member.mode &= 0o755  # no setuid/setgid/sticky, no group/other write
+        tar_ref.extract(member, root)
+
+
 def extract_tar_archive(archive_path, destination_dir):
     """Extract a JDK tarball into ``destination_dir`` (creates dir if needed)."""
     os.makedirs(destination_dir, exist_ok=True)
     print(f"Extracting {archive_path}...")
     try:
         with tarfile.open(archive_path, "r:gz") as tar_ref:
-            tar_ref.extractall(destination_dir)
+            _safe_extractall(tar_ref, destination_dir)
     except PermissionError as exc:
         raise PermissionError(
             f"{exc}. A leftover Java 11 tree or archive under ~/jdk is blocking "
@@ -432,7 +538,7 @@ def install_jdk_macos(jdk_version, jdk_arch):
     jdk_install_dir = os.path.expanduser("~/jdk")
     archive_path = f"{get_home_dir()}/jdk.tar.gz"
 
-    download_jdk_archive(jdk_url, archive_path, jdk_version)
+    download_jdk_archive(jdk_url, archive_path, jdk_version, sha256=pinned_jdk_sha256(jdk_url))
     prepare_managed_jdk_root(jdk_install_dir, jdk_version)
     extract_tar_archive(archive_path, jdk_install_dir)
     set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
@@ -447,7 +553,7 @@ def install_jdk_linux(jdk_version, jdk_arch):
     jdk_install_dir = os.path.expanduser("~/jdk")
     archive_path = f"{get_home_dir()}/jdk.tar.gz"
 
-    download_jdk_archive(jdk_url, archive_path, jdk_version)
+    download_jdk_archive(jdk_url, archive_path, jdk_version, sha256=pinned_jdk_sha256(jdk_url))
     prepare_managed_jdk_root(jdk_install_dir, jdk_version)
     extract_tar_archive(archive_path, jdk_install_dir)
     set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
@@ -462,7 +568,7 @@ def install_jdk_windows(jdk_version, jdk_arch):
     jdk_install_dir = os.path.expanduser("~/jdk")
     archive_path = f"{get_home_dir()}/jdk.zip"
 
-    download_jdk_archive(jdk_url, archive_path, jdk_version)
+    download_jdk_archive(jdk_url, archive_path, jdk_version, sha256=pinned_jdk_sha256(jdk_url))
     prepare_managed_jdk_root(jdk_install_dir, jdk_version)
     extract_zip_archive(archive_path, jdk_install_dir)
     set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")

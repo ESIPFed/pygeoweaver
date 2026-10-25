@@ -8,12 +8,16 @@ compact otherwise); errors are JSON on stderr with a stable exit code.
 import getpass
 import json
 import os
+import re
 import sys
 
 import click
 
 from pygeoweaver.agent.client import (
     EXIT_ERROR,
+    EXIT_USAGE,
+    MAX_STEPS,
+    MIN_POLL_INTERVAL,
     AgentClient,
     EXIT_RUN_FAILED,
     AgentError,
@@ -38,13 +42,36 @@ class _Ctx:
         return self._client
 
 
+# Server data (run logs, process code, error messages) is untrusted. JSON already escapes
+# C0 controls; also escape C1 controls (e.g. U+009B CSI), bidi overrides and line
+# separators so they cannot drive a terminal or hide text from a reader.
+_UNSAFE_JSON = re.compile("[\u007f-\u009f\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]")
+# Raw text to a terminal: drop ESC/OSC sequences and other controls, keep \t and \n.
+_ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[@-Z\\-_])")
+_UNSAFE_TEXT = re.compile("[\x00-\x08\x0b-\x1f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+
+
+def _json_text(data, indent=None):
+    text = json.dumps(data, indent=indent, ensure_ascii=False)
+    return _UNSAFE_JSON.sub(lambda m: "\\u%04x" % ord(m.group()), text)
+
+
 def emit(ctx, data):
     pretty = ctx.pretty if ctx.pretty is not None else sys.stdout.isatty()
-    click.echo(json.dumps(data, indent=2 if pretty else None, ensure_ascii=False))
+    click.echo(_json_text(data, indent=2 if pretty else None))
+
+
+def emit_text(text, nl=True):
+    """Raw server text (logs, code). Sanitized on a terminal; byte-exact when piped."""
+    if sys.stdout.isatty():
+        text = _UNSAFE_TEXT.sub("", _ANSI.sub("", text.replace("\r\n", "\n")))
+    # Not click.echo: it rewrites escape sequences even when piped (e.g. `> code.py`).
+    sys.stdout.write(text + ("\n" if nl else ""))
+    sys.stdout.flush()
 
 
 def fail(err):
-    click.echo(json.dumps(err.to_dict(), ensure_ascii=False), err=True)
+    click.echo(_json_text(err.to_dict()), err=True)
     sys.exit(err.exit_code)
 
 
@@ -115,6 +142,13 @@ def _read_json_arg(value):
     return value
 
 
+def _chain_ids(chain):
+    ids = [p.strip() for p in chain.split(",") if p.strip()]
+    if len(ids) > MAX_STEPS:
+        raise click.UsageError(f"--chain accepts at most {MAX_STEPS} process ids")
+    return ids
+
+
 def _read_secret(prompt, from_stdin):
     if from_stdin:
         return sys.stdin.readline().rstrip("\r\n")
@@ -145,12 +179,17 @@ def _finish_run(ctx, client, started, wait, timeout, interval, log_limit):
         sys.exit(EXIT_RUN_FAILED)
 
 
+_LOG_LIMIT = click.IntRange(0, 1_000_000)
+_INTERVAL = click.FloatRange(min=MIN_POLL_INTERVAL)
+_TIMEOUT = click.FloatRange(min=0)
+
+
 def _wait_options(f):
-    f = click.option("--log-limit", type=int, default=4000, show_default=True,
+    f = click.option("--log-limit", type=_LOG_LIMIT, default=4000, show_default=True,
                      help="Max log characters returned with --wait.")(f)
-    f = click.option("--interval", type=float, default=2.0, show_default=True,
+    f = click.option("--interval", type=_INTERVAL, default=2.0, show_default=True,
                      help="Max seconds between polls with --wait.")(f)
-    f = click.option("--timeout", "wait_timeout", type=float, default=3600, show_default=True,
+    f = click.option("--timeout", "wait_timeout", type=_TIMEOUT, default=3600, show_default=True,
                      help="Seconds to wait with --wait (the run keeps going after).")(f)
     f = click.option("--wait", is_flag=True,
                      help="Block until the run finishes; exit 8 unless status is Done.")(f)
@@ -161,7 +200,8 @@ def _wait_options(f):
 @click.option("--base-url", envvar=None, default=None,
               help="Geoweaver base URL incl. /Geoweaver. Default: GEOWEAVER_BASE_URL, "
                    "GEOWEAVER_PORT, your running Geoweaver JVM, then :8070.")
-@click.option("--http-timeout", type=float, default=30.0, show_default=True)
+@click.option("--http-timeout", type=click.FloatRange(min=0.1, max=600), default=30.0,
+              show_default=True)
 @click.option("--pretty/--compact", default=None, help="JSON formatting (default: pretty on a TTY).")
 @click.pass_context
 def agent(ctx, base_url, http_timeout, pretty):
@@ -219,7 +259,7 @@ def status_cmd(c):
 
 
 @agent.command("ensure")
-@click.option("--timeout", type=float, default=240, show_default=True,
+@click.option("--timeout", type=_TIMEOUT, default=240, show_default=True,
               help="Seconds to wait for the server to answer.")
 @click.option("--no-start", is_flag=True, help="Only check / wait; never start a JVM.")
 @click.option("--allow-second-server", is_flag=True,
@@ -248,29 +288,49 @@ def capabilities_cmd(c):
 @agent.command("login")
 @click.option("--password-stdin", is_flag=True,
               help="Read the GUI localhost password from the first line of stdin.")
-@click.option("--ttl-days", type=int, default=30, show_default=True, help="1..180")
+@click.option("--ttl-days", type=click.IntRange(1, 180), default=30, show_default=True)
 @click.option("--revoke-others", is_flag=True, help="Revoke this server's other tokens.")
+@click.option("--token-file", default=None, type=click.Path(dir_okay=False),
+              help="Required when the port is not owned by your account (Docker -p, sshd -R): "
+                   "write the token to this new file (0600) instead of the store.")
 @click.pass_obj
-def login_cmd(c, password_stdin, ttl_days, revoke_others):
+def login_cmd(c, password_stdin, ttl_days, revoke_others, token_file):
     """
     Mint an Agent API token with the Geoweaver GUI password and store it (0600).
 
-    The password is never accepted on the command line (it would show in `ps`).
+    The password is never accepted on the command line (it would show in `ps`), and the
+    token is never printed.
     """
     client = c.client(sends_password=True)
-    password = _read_secret("Geoweaver GUI localhost password: ", password_stdin)
-    if not password:
-        raise AgentError("bad_request", "Empty password", exit_code=EXIT_ERROR)
-    created = client.create_token(password, ttl_days=ttl_days, revoke_others=revoke_others)
-    if c.info.get("warning"):
-        # Listener not owned by this account (Docker -p, sshd -R, service account): a stored
-        # token would never be sent there automatically, and it must not replace the
-        # loopback token of the user's own Geoweaver. Hand it over once instead.
+    foreign = bool(c.info.get("warning"))
+    if foreign and not token_file:
+        raise AgentError(
+            "token_file_required",
+            "This port is not owned by your account, so the token cannot go to the shared "
+            "store (it would replace your own Geoweaver's token) and is never printed. "
+            "Re-run with --token-file PATH, then pass it as GEOWEAVER_API_TOKEN with --base-url.",
+            exit_code=EXIT_USAGE)
+    out_fd = None
+    if token_file:
+        # Create before sending the password: fail early, and never overwrite/follow a link.
+        out_fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                         | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        password = _read_secret("Geoweaver GUI localhost password: ", password_stdin)
+        if not password:
+            raise AgentError("bad_request", "Empty password", exit_code=EXIT_ERROR)
+        created = client.create_token(password, ttl_days=ttl_days, revoke_others=revoke_others)
+    except BaseException:
+        if out_fd is not None:
+            os.close(out_fd)
+            os.unlink(token_file)
+        raise
+    if out_fd is not None:
+        with os.fdopen(out_fd, "w", encoding="utf-8") as f:
+            f.write(created["token"] + "\n")
         emit(c, {"baseUrl": client.base_url, "fingerprint": created.get("fingerprint"),
                  "expiresAt": created.get("expiresAt"), "stored": None,
-                 "token": created["token"],
-                 "hint": "Not stored: this port is not owned by your account. Keep the token in "
-                         "a secret store and pass it as GEOWEAVER_API_TOKEN with --base-url."})
+                 "tokenFile": os.path.abspath(token_file)})
         return
     entry = discovery.save_token(client.base_url, created)
     emit(c, {"baseUrl": client.base_url, "fingerprint": entry["fingerprint"],
@@ -328,12 +388,13 @@ def process_list(c, name_filter, lang):
 
 @process_grp.command("get")
 @click.argument("process_id")
-@click.option("--code-only", is_flag=True, help="Print the raw code instead of JSON.")
+@click.option("--code-only", is_flag=True,
+              help="Print the raw code instead of JSON (control characters removed on a TTY).")
 @click.pass_obj
 def process_get(c, process_id, code_only):
     p = c.client().get_process(process_id)
     if code_only:
-        click.echo(p.get("code") or "", nl=False)
+        emit_text(p.get("code") or "", nl=False)
         return
     emit(c, p)
 
@@ -390,8 +451,9 @@ def process_run(c, process_id, env_id, client_run_key, ask_password, wait, wait_
 
 @process_grp.command("runs")
 @click.argument("process_id")
-@click.option("--log-limit", type=int, default=0, show_default=True)
-@click.option("--limit", type=int, default=None, help="Only the N most recent runs.")
+@click.option("--log-limit", type=_LOG_LIMIT, default=0, show_default=True)
+@click.option("--limit", type=click.IntRange(min=1), default=None,
+              help="Only the N most recent runs.")
 @click.pass_obj
 def process_runs(c, process_id, log_limit, limit):
     """Run history of a process."""
@@ -437,7 +499,7 @@ def workflow_create(c, name, chain, nodes, edges, description):
     if chain:
         if nodes or edges:
             raise click.UsageError("Use --chain or --nodes/--edges, not both")
-        ids = [p.strip() for p in chain.split(",") if p.strip()]
+        ids = _chain_ids(chain)
         titles = [client.get_process(pid).get("name") or pid for pid in ids]
         node_list, edge_list = linear_workflow_graph(ids, titles)
         nodes, edges = json.dumps(node_list), json.dumps(edge_list)
@@ -460,7 +522,7 @@ def workflow_update(c, workflow_id, name, chain, nodes, edges, description):
     """Edit a workflow (omitted fields are kept)."""
     client = c.client()
     if chain:
-        ids = [p.strip() for p in chain.split(",") if p.strip()]
+        ids = _chain_ids(chain)
         titles = [client.get_process(pid).get("name") or pid for pid in ids]
         node_list, edge_list = linear_workflow_graph(ids, titles)
         nodes, edges = json.dumps(node_list), json.dumps(edge_list)
@@ -497,7 +559,7 @@ def run_grp():
 
 @run_grp.command("get")
 @click.argument("history_id")
-@click.option("--log-limit", type=int, default=4000, show_default=True)
+@click.option("--log-limit", type=_LOG_LIMIT, default=4000, show_default=True)
 @click.pass_obj
 def run_get(c, history_id, log_limit):
     """Status + log of a run; workflow runs include per-step ``steps``."""
@@ -507,9 +569,9 @@ def run_get(c, history_id, log_limit):
 
 @run_grp.command("wait")
 @click.argument("history_id")
-@click.option("--timeout", type=float, default=3600, show_default=True)
-@click.option("--interval", type=float, default=2.0, show_default=True)
-@click.option("--log-limit", type=int, default=4000, show_default=True)
+@click.option("--timeout", type=_TIMEOUT, default=3600, show_default=True)
+@click.option("--interval", type=_INTERVAL, default=2.0, show_default=True)
+@click.option("--log-limit", type=_LOG_LIMIT, default=4000, show_default=True)
 @click.pass_obj
 def run_wait(c, history_id, timeout, interval, log_limit):
     """Block until the run is terminal. Exit 0 if Done, 8 otherwise, 124 on timeout."""
@@ -522,12 +584,12 @@ def run_wait(c, history_id, timeout, interval, log_limit):
 
 @run_grp.command("logs")
 @click.argument("history_id")
-@click.option("--log-limit", type=int, default=4000, show_default=True)
+@click.option("--log-limit", type=_LOG_LIMIT, default=4000, show_default=True)
 @click.pass_obj
 def run_logs(c, history_id, log_limit):
     """Print the run's log as plain text."""
     run = c.client().get_run(history_id, log_limit=log_limit)
-    click.echo(run.get("log") or "")
+    emit_text(run.get("log") or "")
 
 
 @run_grp.command("stop")

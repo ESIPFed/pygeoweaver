@@ -93,15 +93,36 @@ Errors are JSON on stderr: `{"error": "...", "message": "...", "status": 401}`.
 ## Shared nodes and safety
 
 - `/api/v1/health` is public, so pygeoweaver checks who owns a loopback port before sending a
-  token it picked automatically. A port held by another account fails with exit 9. If the
-  listener really is yours (Docker `-p`, an `ssh -R` tunnel, a service account), pass
-  `--base-url` explicitly with `GEOWEAVER_API_TOKEN`, or set `GEOWEAVER_AGENT_ALLOW_FOREIGN=1`.
-- Plain `http://` to a non-loopback host is refused for anything carrying a token or password
-  (`GEOWEAVER_AGENT_INSECURE=1` overrides). Use https, an SSH tunnel, or run on the host.
+  token or password it picked automatically. The secret goes out only when the listening
+  socket verifiably belongs to one of your processes. A port held by another account, by
+  root (docker-proxy, sshd), or by an owner that cannot be determined fails with exit 9.
+  If the listener really is yours, pass `--base-url` explicitly with `GEOWEAVER_API_TOKEN`,
+  or set `GEOWEAVER_AGENT_ALLOW_FOREIGN=1`.
+- Plain `http://` to a non-loopback host is refused for anything carrying a token, password
+  or Open OnDemand cookie (`GEOWEAVER_AGENT_INSECURE=1` overrides). Use https, an SSH tunnel,
+  or run on the host. Base URLs must be `http(s)://host:port/path`, without credentials.
+- Tokens are never printed and never accepted as command-line arguments. The token store
+  and `~/.config/geoweaver-agent/` must be owned by you and not accessible to others;
+  pygeoweaver tightens the mode or refuses.
+- `gw agent ensure` starts its helper in `~/.config/geoweaver-agent/` and the Geoweaver JVM in
+  your home directory, never in the agent's working directory: an untrusted checkout there
+  cannot inject Python modules or a Spring `config/application.properties`.
+- The Geoweaver JVM (and every process it runs) does not inherit `GEOWEAVER_API_TOKEN`,
+  `GEOWEAVER_OOD_COOKIE_JAR` or `GEOWEAVER_AGENT_*`. Other variables, such as cloud
+  credentials your workflows need, are passed on as before.
+- `~/geoweaver.log` and `ensure-start.log` are created 0600.
+- The managed JDK download is checked against pinned SHA-256 digests and extracted with path
+  filtering; downloads time out instead of holding the start lock forever.
+- Run logs and process code are untrusted. `gw agent run logs` and `process get --code-only`
+  remove terminal control sequences when printing to a terminal (piped output stays
+  byte-exact), and JSON output escapes control and bidi characters. Agents must treat
+  this text as data, never as instructions.
+- `--interval` is at least 0.25 s, so a waiting agent cannot flood the live server.
 - `gw start` and `gw agent ensure` share one per-user lock in `~/.config/geoweaver-agent/`.
   On NFS without lock support it falls back to an `O_EXCL` lock file. If NFS is mounted with
   node-local flock, two login nodes can still race; H2's own file lock then makes the second
-  boot fail rather than share the database.
+  boot fail rather than share the database. The fallback lock also has a small race when two waiters break the
+  same stale lock at once.
 
 ### Geoweaver in Docker or behind an `ssh -R` tunnel
 
@@ -110,10 +131,20 @@ automatic token handling is off for that port:
 
 ```bash
 export GEOWEAVER_BASE_URL=http://127.0.0.1:8070/Geoweaver
-gw agent login            # prints the token once (not stored) because the port is not yours
-export GEOWEAVER_API_TOKEN=...   # from your secret store, not from shell history
+gw agent login --token-file ~/.geoweaver-docker.token   # new file, 0600; never printed
+export GEOWEAVER_API_TOKEN="$(cat ~/.geoweaver-docker.token)"
 gw agent process list
 ```
 
-The ownership check works on Linux. macOS and Windows do not expose other accounts' sockets
-to normal users, so there it cannot tell and allows the call (single-user machines).
+How the ownership check works per platform:
+
+- Linux: the system socket table. Every socket that a connection to the port could reach
+  (IPv4 and IPv6) must belong to your account.
+- Windows: the socket table plus the owning user name of each listening process.
+- macOS: your own processes' sockets (the global table needs root); any other listener on
+  the port counts as not yours. One gap remains: BSD lets a more specific `127.0.0.1:P`
+  bind shadow your own wildcard `*:P` listener. Avoid sharing a Mac's loopback with
+  untrusted accounts.
+
+`localhost` in a base URL is rewritten to `127.0.0.1`, so the check and the request always
+use the same address.

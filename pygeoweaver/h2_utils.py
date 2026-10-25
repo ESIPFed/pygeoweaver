@@ -16,6 +16,19 @@ from pygeoweaver.config import H2_VERSION
 from pygeoweaver.config_utils import get_database_url_from_properties, read_properties_file
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_DB_PASSWORD, GEOWEAVER_DEFAULT_DB_USERNAME
 from pygeoweaver.jdk_utils import download_file
+
+# SHA-256 of h2-<version>.jar on Maven Central (it is executed with java during maintenance).
+H2_JAR_SHA256 = {"2.2.224": "b9d8f19358ada82a4f6eb5b174c6cfe320a375b5a9cb5a4fe456d623e6e55497"}
+
+
+def _h2_jar_sha256(download_url):
+    """Pinned digest, else Maven Central's published ``.sha256`` for an H2_VERSION override."""
+    if H2_VERSION in H2_JAR_SHA256:
+        return H2_JAR_SHA256[H2_VERSION]
+    import urllib.request
+
+    with urllib.request.urlopen(download_url + ".sha256", timeout=30) as resp:
+        return resp.read().decode("ascii").split()[0].strip().lower()
 from pygeoweaver.utils import get_home_dir, get_java_bin_path
 
 logger = logging.getLogger(__name__)
@@ -1243,7 +1256,7 @@ def get_h2_jar_path(h2_jar_path: Optional[str] = None) -> Optional[str]:
         f"https://repo1.maven.org/maven2/com/h2database/h2/{H2_VERSION}/h2-{H2_VERSION}.jar"
     )
     try:
-        download_file(download_url, target)
+        download_file(download_url, target, sha256=_h2_jar_sha256(download_url))
         return target if os.path.exists(target) else None
     except Exception as exc:
         logger.warning("Failed to download H2 JAR for maintenance: %s", exc)

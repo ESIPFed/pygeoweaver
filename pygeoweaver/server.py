@@ -10,7 +10,7 @@ import psutil
 import requests
 from halo import Halo
 
-from pygeoweaver.agent.discovery import is_geoweaver_jvm
+from pygeoweaver.agent.discovery import agent_child_env, is_geoweaver_jvm, open_private_log
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL, GEOWEAVER_PORT
 from pygeoweaver.h2_utils import (
     get_safe_datasource_url_for_start,
@@ -122,7 +122,7 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
             start_cmd.append(f"-Dspring.datasource.url={datasource_url}")
         start_cmd.extend(["-jar", geoweaver_jar])
         print(" ".join(start_cmd))
-        env = os.environ.copy()
+        env = agent_child_env(jvm=True)
         env["GEOWEAVER_PORT"] = str(port)
         subprocess.Popen(
             start_cmd,
@@ -130,6 +130,7 @@ def start_on_windows(force_restart=False, force_download=False, exit_on_finish=T
             stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NEW_CONSOLE,
             env=env,
+            cwd=home_dir,  # never the caller's cwd: Spring Boot reads ./config/*.properties
         )
 
         status = 0
@@ -218,9 +219,11 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
             cmds.append(f"-Dspring.datasource.url={datasource_url}")
         cmds.extend(["-jar", os.path.expanduser("~/geoweaver.jar")])
         logger.info("Running %s", " ".join(cmds))
-        env = os.environ.copy()
+        # No agent tokens in the JVM env: every process Geoweaver runs inherits it.
+        env = agent_child_env(jvm=True)
         env["GEOWEAVER_PORT"] = str(port)
-        with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
+        # 0600: run output lands here and home directories are often 0755 on clusters.
+        with open_private_log(os.path.expanduser("~/geoweaver.log"), "wb") as log_file:
             # New session: an SSH/agent logout (SIGHUP) must not kill the server.
             subprocess.Popen(
                 cmds,
@@ -228,6 +231,9 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
                 env=env,
+                # Never the caller's cwd (maybe an untrusted repo): Spring Boot reads
+                # ./application.properties and ./config/ from the working directory.
+                cwd=os.path.expanduser("~"),
                 start_new_session=True,
             )
 

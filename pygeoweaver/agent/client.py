@@ -30,6 +30,9 @@ EXIT_FOREIGN = 9
 EXIT_TIMEOUT = 124
 
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+EXIT_USAGE = 2
+MIN_POLL_INTERVAL = 0.25  # never busy-poll a live server
+MAX_STEPS = 500
 
 
 class AgentError(Exception):
@@ -52,6 +55,46 @@ class AgentError(Exception):
 def is_loopback_url(base_url):
     host = urllib.parse.urlsplit(base_url).hostname or ""
     return host in LOOPBACK_HOSTS
+
+
+def validate_base_url(base_url):
+    """Only plain ``http(s)://host[:port]/path`` URLs: no other schemes (urllib would read
+    ``file://``), no credentials (they would be echoed in errors), no query/fragment."""
+    def bad(why):
+        return AgentError("bad_base_url", f"Invalid Geoweaver base URL ({why}); expected "
+                          "http(s)://host:port/Geoweaver", exit_code=EXIT_USAGE)
+    try:
+        parts = urllib.parse.urlsplit(base_url)
+        parts.port  # raises ValueError for a non-numeric / out-of-range port
+    except ValueError:
+        raise bad("bad port") from None
+    if parts.scheme not in ("http", "https"):
+        raise bad("scheme must be http or https")
+    if not parts.hostname:
+        raise bad("no host")
+    if "@" in parts.netloc:
+        raise bad("credentials in the URL are not allowed")
+    if parts.query or parts.fragment:
+        raise bad("query/fragment not allowed")
+    return base_url
+
+
+def _normalize_loopback(base_url):
+    from pygeoweaver.agent.discovery import normalize_loopback
+
+    return normalize_loopback(base_url)
+
+
+_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _seg(value, what="id"):
+    """One URL path segment from an id; ``../x`` or ``a/b`` never reaches another endpoint."""
+    value = str(value)
+    if not _ID.match(value):
+        raise AgentError("bad_request", f"Invalid {what} {value[:40]!r}: expected letters, "
+                         "digits, '_' or '-'", exit_code=EXIT_USAGE)
+    return urllib.parse.quote(value, safe="")
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -78,7 +121,7 @@ class AgentClient:
     """
 
     def __init__(self, base_url, token=None, cookie_jar=None, timeout=30.0, allow_insecure=None):
-        self.base_url = base_url.rstrip("/")
+        self.base_url = validate_base_url(_normalize_loopback(base_url.rstrip("/")))
         self.token = token
         self.timeout = timeout
         if allow_insecure is None:
@@ -88,12 +131,14 @@ class AgentClient:
         if is_loopback_url(self.base_url):
             # Cluster nodes often export http_proxy; loopback must never go through it.
             handlers.append(urllib.request.ProxyHandler({}))
+        self.uses_cookies = False
         cookie_jar = cookie_jar or os.getenv("GEOWEAVER_OOD_COOKIE_JAR")
         if cookie_jar and os.path.isfile(cookie_jar):
             jar = http.cookiejar.MozillaCookieJar(cookie_jar)
             try:
                 jar.load(ignore_discard=True, ignore_expires=True)
                 handlers.append(urllib.request.HTTPCookieProcessor(jar))
+                self.uses_cookies = True
             except (OSError, http.cookiejar.LoadError):
                 pass
         self._opener = urllib.request.build_opener(*handlers)
@@ -111,7 +156,8 @@ class AgentClient:
         if body is not None:
             data = json.dumps(body).encode("utf-8")
             headers["Content-Type"] = "application/json"
-        if (auth or body is not None) and not self.allow_insecure:
+        # OOD session cookies are credentials too.
+        if (auth or body is not None or self.uses_cookies) and not self.allow_insecure:
             self._require_secure_transport()
         if auth:
             if not self.token:
@@ -122,8 +168,10 @@ class AgentClient:
                     exit_code=EXIT_UNAUTHORIZED,
                 )
             headers["Authorization"] = f"Bearer {self.token}"
-            # Some Open OnDemand proxies strip Authorization; Geoweaver also reads this header.
-            headers["X-Geoweaver-Agent-Token"] = self.token
+            if self.uses_cookies:
+                # Some Open OnDemand proxies strip Authorization; Geoweaver also reads this
+                # header. Only sent through OOD, so the token is not duplicated elsewhere.
+                headers["X-Geoweaver-Agent-Token"] = self.token
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
             with self._opener.open(req, timeout=timeout or self.timeout) as resp:
@@ -221,7 +269,7 @@ class AgentClient:
         return self.request("GET", "/tokens")
 
     def revoke_token(self, fingerprint):
-        return self.request("DELETE", f"/tokens/{urllib.parse.quote(fingerprint)}")
+        return self.request("DELETE", f"/tokens/{_seg(fingerprint)}")
 
     # ------------------------------------------------------------------ processes
 
@@ -229,7 +277,7 @@ class AgentClient:
         return self.request("GET", "/processes")
 
     def get_process(self, process_id):
-        return self.request("GET", f"/processes/{urllib.parse.quote(process_id)}")
+        return self.request("GET", f"/processes/{_seg(process_id)}")
 
     def create_process(self, name, code, lang="python", description=None):
         return self.request(
@@ -239,20 +287,20 @@ class AgentClient:
 
     def update_process(self, process_id, name=None, code=None, lang=None, description=None):
         return self.request(
-            "PUT", f"/processes/{urllib.parse.quote(process_id)}",
+            "PUT", f"/processes/{_seg(process_id)}",
             body={"name": name, "lang": lang, "code": code, "description": description},
         )
 
     def run_process(self, process_id, env_id=None, host_password=None, client_run_key=None):
         return self.request(
-            "POST", f"/processes/{urllib.parse.quote(process_id)}/runs",
+            "POST", f"/processes/{_seg(process_id)}/runs",
             body={"hostId": None, "hostPassword": host_password, "envId": env_id,
                   "clientRunKey": client_run_key},
         )
 
     def list_process_runs(self, process_id, log_limit=None):
         return self.request(
-            "GET", f"/processes/{urllib.parse.quote(process_id)}/runs",
+            "GET", f"/processes/{_seg(process_id)}/runs",
             params={"logLimit": log_limit},
         )
 
@@ -262,7 +310,7 @@ class AgentClient:
         return self.request("GET", "/workflows")
 
     def get_workflow(self, workflow_id):
-        return self.request("GET", f"/workflows/{urllib.parse.quote(workflow_id)}")
+        return self.request("GET", f"/workflows/{_seg(workflow_id)}")
 
     def create_workflow(self, name, nodes, edges="[]", description=None):
         return self.request(
@@ -273,14 +321,14 @@ class AgentClient:
 
     def update_workflow(self, workflow_id, name=None, nodes=None, edges=None, description=None):
         return self.request(
-            "PUT", f"/workflows/{urllib.parse.quote(workflow_id)}",
+            "PUT", f"/workflows/{_seg(workflow_id)}",
             body={"name": name, "nodes": _as_json_text(nodes), "edges": _as_json_text(edges),
                   "description": description},
         )
 
     def run_workflow(self, workflow_id, mode="one", host_password=None, client_run_key=None):
         return self.request(
-            "POST", f"/workflows/{urllib.parse.quote(workflow_id)}/runs",
+            "POST", f"/workflows/{_seg(workflow_id)}/runs",
             body={"mode": mode, "hostPassword": host_password, "clientRunKey": client_run_key},
         )
 
@@ -293,7 +341,7 @@ class AgentClient:
         ids = workflow_step_ids(run)
         if ids:
             steps = []
-            for hid in ids:
+            for hid in ids[:MAX_STEPS]:
                 try:
                     steps.append(self.get_run(hid, log_limit=log_limit))
                 except AgentError as e:
@@ -303,16 +351,17 @@ class AgentClient:
 
     def get_run(self, history_id, log_limit=None):
         return self.request(
-            "GET", f"/runs/{urllib.parse.quote(history_id)}", params={"logLimit": log_limit}
+            "GET", f"/runs/{_seg(history_id)}", params={"logLimit": log_limit}
         )
 
     def stop_run(self, history_id):
-        return self.request("POST", f"/runs/{urllib.parse.quote(history_id)}/stop")
+        return self.request("POST", f"/runs/{_seg(history_id)}/stop")
 
     def wait_run(self, history_id, timeout=600.0, interval=1.0, log_limit=None, on_poll=None):
         """Poll a run until it reaches a terminal status; raises ``AgentError`` on timeout."""
         deadline = time.monotonic() + timeout
-        delay = min(0.25, interval)
+        interval = max(interval, MIN_POLL_INTERVAL)
+        delay = MIN_POLL_INTERVAL
         while True:
             run = self.get_run(history_id, log_limit=log_limit)
             if on_poll:

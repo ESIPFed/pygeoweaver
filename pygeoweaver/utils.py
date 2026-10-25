@@ -1,4 +1,5 @@
 import os
+import zipfile
 import sys
 import shutil
 import logging
@@ -345,7 +346,7 @@ def download_geoweaver_jar(overwrite=False, url=None, channel=None):
     Re-downloads when the channel marker differs from the desired channel.
     """
     # Lazy import avoids circular dependency with jdk_utils -> utils.
-    from pygeoweaver.jdk_utils import ensure_geoweaver_runtime
+    from pygeoweaver.jdk_utils import copy_with_deadline, ensure_geoweaver_runtime
 
     runtime = ensure_geoweaver_runtime()
     jar_url = url or runtime.jar_url or GEOWEAVER_URL
@@ -380,10 +381,20 @@ def download_geoweaver_jar(overwrite=False, url=None, channel=None):
 
     label = "legacy Geoweaver 2.1.x" if jar_channel != GEOWEAVER_JAR_CHANNEL_LATEST else "latest Geoweaver"
     with get_spinner(text=f'Downloading {label}...', spinner='dots'):
-        r = requests.get(jar_url)
-        r.raise_for_status()
-        with open(jar_path, "wb") as f:
-            f.write(r.content)
+        # Timeout: this runs under the Geoweaver start lock. Temp file + zip check + rename:
+        # an interrupted download never leaves a truncated jar that would be reused forever.
+        part = f"{jar_path}.{os.getpid()}.part"
+        try:
+            with requests.get(jar_url, stream=True, timeout=(30, 120)) as r:
+                r.raise_for_status()
+                with open(part, "wb") as f:
+                    copy_with_deadline(r.iter_content(chunk_size=1 << 20), f, jar_url)
+            if not zipfile.is_zipfile(part):
+                raise RuntimeError(f"Downloaded file from {jar_url} is not a valid jar")
+            os.replace(part, jar_path)
+        finally:
+            if os.path.exists(part):
+                os.remove(part)
 
         if check_geoweaver_jar():
             write_geoweaver_jar_channel(jar_channel)
