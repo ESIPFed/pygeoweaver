@@ -10,6 +10,7 @@ import psutil
 import requests
 from halo import Halo
 
+from pygeoweaver.agent.discovery import is_geoweaver_jvm
 from pygeoweaver.constants import GEOWEAVER_DEFAULT_ENDPOINT_URL, GEOWEAVER_PORT
 from pygeoweaver.h2_utils import (
     get_safe_datasource_url_for_start,
@@ -65,26 +66,25 @@ def geoweaver_endpoint_url() -> str:
 
 def check_geoweaver_status() -> bool:
     """
-    Check if geoweaver is running
+    Check if the current user's Geoweaver is running.
+
+    Only JVMs owned by this user count: on shared login/compute nodes another
+    user's ``geoweaver.jar`` must not make ``gw start`` skip starting ours.
     """
     try:
-        # Run 'ps' command to list all processes
-        ps_output = subprocess.check_output(['ps', 'aux']).decode('utf-8').splitlines()
-        
-        # Check each line of ps output for 'geoweaver.jar'
-        geoweaver_running = False
-        for line in ps_output:
-            if 'geoweaver.jar' in line:
-                geoweaver_running = True
-                break
-        
+        if hasattr(os, "getuid"):
+            geoweaver_running = bool(find_geoweaver_processes(os.getuid()))
+        else:
+            ps_output = subprocess.check_output(['ps', 'aux']).decode('utf-8').splitlines()
+            geoweaver_running = any('geoweaver.jar' in line for line in ps_output)
+
         if geoweaver_running:
             logger.info("Geoweaver is running.")
             return True
         else:
             logger.info("Geoweaver is not running.")
             return False
-    
+
     except subprocess.CalledProcessError as e:
         err_msg = f"Error checking Geoweaver status: {e}"
         logger.error(err_msg)
@@ -221,11 +221,14 @@ def start_on_mac_linux(force_restart: bool=False, force_download: bool=False, ex
         env = os.environ.copy()
         env["GEOWEAVER_PORT"] = str(port)
         with open(os.path.expanduser("~/geoweaver.log"), 'w') as log_file:
+            # New session: an SSH/agent logout (SIGHUP) must not kill the server.
             subprocess.Popen(
                 cmds,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
                 env=env,
+                start_new_session=True,
             )
 
         # Wait for Geoweaver to start (Boot 3 / large jar needs more than ~20s on CI)
@@ -295,9 +298,7 @@ def find_geoweaver_processes(current_uid):
     processes = []
     for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'uids']):
         try:
-            if (proc.info and proc.info['cmdline'] and
-                ('geoweaver.jar' in " ".join(proc.info['cmdline']) or
-                 'GeoweaverApplication' in " ".join(proc.info['cmdline'])) and
+            if (proc.info and is_geoweaver_jvm(proc.info['cmdline']) and
                 proc.info['uids'] and proc.info['uids'].real == current_uid):
                 processes.append(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -372,6 +373,32 @@ def stop_on_mac_linux(
 
 
 def start(force_download=False, force_restart=False, exit_on_finish=True):
+    """
+    Start Geoweaver. Holds the same per-user lock as ``gw agent ensure`` so an agent and a
+    human (or two agents) never boot two JVMs on one H2 database.
+    """
+    from pygeoweaver.agent.client import AgentError
+    from pygeoweaver.agent.locking import start_lock
+
+    if not force_restart and check_geoweaver_status():
+        print("Geoweaver is already running.")
+        if exit_on_finish:
+            safe_exit(0)
+        return
+    try:
+        # Same patience as an agent-started boot (slow JDK/jar downloads on clusters).
+        lock = start_lock(timeout=3600)
+        print("Acquiring the Geoweaver start lock (waits while another start is in progress; "
+              "see ~/.config/geoweaver-agent/ensure-start.log)...")
+        with lock:
+            _start_locked(force_download, force_restart, exit_on_finish)
+    except AgentError as e:
+        print(f"Error: {e.message}")
+        if exit_on_finish:
+            safe_exit(1)
+
+
+def _start_locked(force_download=False, force_restart=False, exit_on_finish=True):
     # Resolve Java / jar channel first so download picks latest vs legacy correctly.
     ensure_geoweaver_runtime()
     download_geoweaver_jar(overwrite=force_download)

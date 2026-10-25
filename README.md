@@ -39,6 +39,22 @@ You can then install PyGeoWeaver using pip:
 pip install pygeoweaver
 ```
 
+## AI agents (fast, over SSH)
+
+`gw agent …` drives a **running** Geoweaver through its Agent API: JSON output, ~0.2 s per
+call instead of booting a JVM, and every change shows up live in the Geoweaver GUI. Built for
+AI agents that reach Geoweaver over SSH (firewall, VPN, Open OnDemand).
+
+```bash
+gw agent ensure                       # make sure Geoweaver is up (never restarts it)
+gw agent login                        # once: GUI password -> stored token (0600)
+gw agent process create --name hello --lang python --code 'print(42)'
+gw agent process run <id> --wait
+gw agent guide                        # playbook for the AI
+```
+
+See [docs/agent-ssh.md](docs/agent-ssh.md).
+
 ## Startup
 
 To start using PyGeoWeaver, you can launch the GeoWeaver graphical user interface by executing the following command in a Jupyter notebook cell:
