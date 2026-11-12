@@ -1,4 +1,5 @@
 import hashlib
+import json
 import platform
 import os
 import subprocess
@@ -24,7 +25,8 @@ from pygeoweaver.constants import (
     GEOWEAVER_URL,
 )
 
-# Temurin 17 LTS used when pygeoweaver auto-installs a JDK.
+# Temurin 17 is the compatibility default; callers can request any supported
+# major through ``install_latest_jdk``.
 _DEFAULT_JDK17_VERSION = GEOWEAVER_MANAGED_JDK17_VERSION
 
 # Cached result of ensure_geoweaver_runtime() for the current process.
@@ -222,37 +224,100 @@ def _java_home_from_bin(java_bin):
     return os.path.dirname(bin_dir)
 
 
-def install_jdk():
+def _platform_jdk_details():
+    """Return (adoptium_os, archive_ext, legacy_arch_label) for this host."""
     system = platform.system()
     architecture = platform.machine()
-    jdk_version = _DEFAULT_JDK17_VERSION
 
     if system == "Darwin":
         if architecture == "x86_64":
-            install_jdk_macos(jdk_version, "jdk_x64_mac_hotspot")
+            return "mac", "tar.gz", "jdk_x64_mac_hotspot"
         elif architecture == "arm64":
-            install_jdk_macos(jdk_version, "jdk_aarch64_mac_hotspot")
-        else:
-            print("Unsupported architecture.")
-
+            return "mac", "tar.gz", "jdk_aarch64_mac_hotspot"
     elif system == "Linux":
         if architecture == "x86_64":
-            install_jdk_linux(jdk_version, "jdk_x64_linux_hotspot")
+            return "linux", "tar.gz", "jdk_x64_linux_hotspot"
         elif architecture == "aarch64":
-            install_jdk_linux(jdk_version, "jdk_aarch64_linux_hotspot")
-        else:
-            print("Unsupported architecture.")
-
+            return "linux", "tar.gz", "jdk_aarch64_linux_hotspot"
     elif system == "Windows":
         if architecture == "AMD64" or architecture == "x86_64":
-            install_jdk_windows(jdk_version, "jdk_x64_windows_hotspot")
+            return "windows", "zip", "jdk_x64_windows_hotspot"
         elif architecture == "x86-32":
-            install_jdk_windows(jdk_version, "jdk_x86-32_windows_hotspot")
-        else:
-            print("Unsupported architecture.")
+            return "windows", "zip", "jdk_x86-32_windows_hotspot"
+    raise RuntimeError("Unsupported platform or architecture.")
 
-    else:
-        print("Unsupported platform.")
+
+def _jdk_major_from_version(jdk_version):
+    try:
+        return int(str(jdk_version).split(".", 1)[0])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("JDK version must start with a numeric major version.") from exc
+
+
+def temurin_release_url(jdk_version, jdk_arch, archive_ext):
+    """Build the official Temurin release URL for any JDK major."""
+    major = _jdk_major_from_version(jdk_version)
+    return (
+        f"https://github.com/adoptium/temurin{major}-binaries/releases/download/"
+        f"jdk-{jdk_version.replace('-', '%2B')}/"
+        f"OpenJDK{major}U-{jdk_arch}_{jdk_version.replace('-', '_')}.{archive_ext}"
+    )
+
+
+def _adoptium_architecture(jdk_arch):
+    if "x64" in jdk_arch:
+        return "x64"
+    if "aarch64" in jdk_arch:
+        return "aarch64"
+    if "x86-32" in jdk_arch:
+        return "x32"
+    raise RuntimeError(f"Unsupported Temurin architecture: {jdk_arch}")
+
+
+def resolve_latest_temurin_jdk(major, adoptium_os, jdk_arch):
+    """Return (version, archive URL, SHA-256) for the latest GA Temurin JDK."""
+    if major < GEOWEAVER_MIN_JAVA_MAJOR:
+        raise ValueError(f"JDK major must be at least {GEOWEAVER_MIN_JAVA_MAJOR}.")
+    query = urllib.parse.urlencode(
+        {
+            "architecture": _adoptium_architecture(jdk_arch),
+            "image_type": "jdk",
+            "jvm_impl": "hotspot",
+            "os": adoptium_os,
+            "vendor": "eclipse",
+        }
+    )
+    api_url = f"https://api.adoptium.net/v3/assets/latest/{major}/hotspot?{query}"
+    with urllib.request.urlopen(api_url, timeout=DOWNLOAD_TIMEOUT) as response:
+        assets = json.loads(response.read().decode("utf-8"))
+    if not assets:
+        raise RuntimeError(f"Adoptium has no GA Temurin JDK {major} for this platform.")
+    asset = assets[0]
+    package = asset.get("binary", {}).get("package", {})
+    url = package.get("link")
+    checksum = package.get("checksum")
+    release_name = asset.get("release_name", "")
+    if not release_name.startswith("jdk-"):
+        raise RuntimeError("Adoptium returned an invalid JDK release name.")
+    version = release_name[len("jdk-"):].replace("+", "-")
+    if not (url and checksum and len(checksum) == 64):
+        raise RuntimeError("Adoptium did not provide a verifiable JDK package.")
+    if urllib.parse.urlsplit(url).scheme != "https":
+        raise RuntimeError("Adoptium returned a non-HTTPS JDK package URL.")
+    return version, url, checksum.lower()
+
+
+def install_latest_jdk(major=GEOWEAVER_MIN_JAVA_MAJOR):
+    """Install the latest GA Temurin JDK for ``major`` under ``~/jdk``."""
+    adoptium_os, archive_ext, jdk_arch = _platform_jdk_details()
+    version, url, sha256 = resolve_latest_temurin_jdk(major, adoptium_os, jdk_arch)
+    _install_jdk(version, jdk_arch, archive_ext, url=url, sha256=sha256)
+
+
+def install_jdk(jdk_version=None):
+    """Install a requested Temurin build, defaulting to the patched Java 17 release."""
+    _, archive_ext, jdk_arch = _platform_jdk_details()
+    _install_jdk(jdk_version or _DEFAULT_JDK17_VERSION, jdk_arch, archive_ext)
 
 
 def managed_jdk_dir_name(jdk_version):
@@ -316,23 +381,6 @@ def archive_matches_jdk_version(archive_path, jdk_version):
     return False
 
 
-# SHA-256 of the pinned Temurin archives (from Adoptium's *.sha256.txt release files).
-# Update together with GEOWEAVER_MANAGED_JDK17_VERSION; a missing entry fails closed.
-TEMURIN_SHA256 = {
-    "OpenJDK17U-jdk_x64_mac_hotspot_17.0.13_11.tar.gz":
-        "840535070200a944a6b582d258ee84608bd25c9f2b5d1cdddb58dfadb019675a",
-    "OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.13_11.tar.gz":
-        "d8b2f77f755d06e81a540834c5be22ed86f3c8a51a20396606c074303f8f9e2d",
-    "OpenJDK17U-jdk_x64_linux_hotspot_17.0.13_11.tar.gz":
-        "8682892fc02965930b9022c066fa164dd6f458ef4a5dc262016aa28333b30f49",
-    "OpenJDK17U-jdk_aarch64_linux_hotspot_17.0.13_11.tar.gz":
-        "0c17fa4f14c0d2cc9e9334f996fccdddc5da4459d768f3105c7ff0283c47bf62",
-    "OpenJDK17U-jdk_x64_windows_hotspot_17.0.13_11.zip":
-        "6b64255e1bd690b09a135d44ac6b0d6bd4490728a8bad81904941d2789d394c0",
-    "OpenJDK17U-jdk_x86-32_windows_hotspot_17.0.13_11.zip":
-        "04874767c1c82f0aee20fd558770fbf2e7aca7c3c19e1df0a8dd3d0ab4b668a2",
-}
-
 DOWNLOAD_TIMEOUT = 60  # seconds without data; downloads run under the Geoweaver start lock
 DOWNLOAD_DEADLINE = 1800  # seconds for a whole download (a slow drip must not hold the lock)
 
@@ -346,10 +394,16 @@ def copy_with_deadline(chunks, out, url, deadline_s=DOWNLOAD_DEADLINE):
 
 
 def pinned_jdk_sha256(url):
-    name = os.path.basename(urllib.parse.urlsplit(url).path)
-    digest = TEMURIN_SHA256.get(name)
-    if not digest:
-        raise RuntimeError(f"No pinned SHA-256 for {name}; refusing to install an unverified JDK.")
+    """Retrieve the publisher's SHA-256 sidecar for an official Temurin asset."""
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "https" or parsed.netloc != "github.com":
+        raise RuntimeError("Refusing to install a JDK without an official Adoptium SHA-256.")
+    if not parsed.path.startswith("/adoptium/temurin") or "/releases/download/" not in parsed.path:
+        raise RuntimeError("Refusing a JDK package outside an Adoptium Temurin release.")
+    with urllib.request.urlopen(url + ".sha256.txt", timeout=DOWNLOAD_TIMEOUT) as response:
+        digest = response.read().decode("utf-8").split()[0].lower()
+    if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+        raise RuntimeError("Adoptium returned an invalid JDK SHA-256.")
     return digest
 
 
@@ -429,10 +483,11 @@ def download_jdk_archive(url, filename, jdk_version, sha256=None):
 
 def prepare_managed_jdk_root(jdk_install_dir, jdk_version):
     """
-    Create ``~/jdk`` and move aside other managed JDK homes before extract.
+    Create ``~/jdk`` and move aside only obsolete managed JDK homes before extract.
 
     This avoids extractall writing into an old ``jdk-11*`` tree when a stale
-    archive is present, and keeps the install directory writable without sudo.
+    archive is present, while preserving Java 17+ installations selected with
+    ``gw installjdk --major``.
     """
     os.makedirs(jdk_install_dir, exist_ok=True)
     expected = managed_jdk_dir_name(jdk_version)
@@ -450,6 +505,12 @@ def prepare_managed_jdk_root(jdk_install_dir, jdk_version):
         if not name.startswith("jdk-"):
             continue
         if name == expected:
+            continue
+        try:
+            installed_major = _jdk_major_from_version(name[len("jdk-"):].replace("+", "-"))
+        except ValueError:
+            installed_major = None
+        if installed_major is not None and installed_major >= GEOWEAVER_MIN_JAVA_MAJOR:
             continue
         try:
             move_aside_path(path)
@@ -529,49 +590,32 @@ def extract_zip_archive(archive_path, destination_dir):
     print(f"{archive_path} extracted to {destination_dir}.")
 
 
-def install_jdk_macos(jdk_version, jdk_arch):
-    jdk_url = (
-        f"https://github.com/adoptium/temurin17-binaries/releases/download/"
-        f"jdk-{jdk_version.replace('-', '%2B')}/"
-        f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.tar.gz"
-    )
+def _install_jdk(jdk_version, jdk_arch, archive_ext, url=None, sha256=None):
+    """Download, verify, extract, and activate a Temurin JDK release."""
+    jdk_url = url or temurin_release_url(jdk_version, jdk_arch, archive_ext)
+    sha256 = sha256 or pinned_jdk_sha256(jdk_url)
     jdk_install_dir = os.path.expanduser("~/jdk")
-    archive_path = f"{get_home_dir()}/jdk.tar.gz"
+    archive_path = f"{get_home_dir()}/jdk.{archive_ext}"
 
-    download_jdk_archive(jdk_url, archive_path, jdk_version, sha256=pinned_jdk_sha256(jdk_url))
+    download_jdk_archive(jdk_url, archive_path, jdk_version, sha256=sha256)
     prepare_managed_jdk_root(jdk_install_dir, jdk_version)
-    extract_tar_archive(archive_path, jdk_install_dir)
+    if archive_ext == "zip":
+        extract_zip_archive(archive_path, jdk_install_dir)
+    else:
+        extract_tar_archive(archive_path, jdk_install_dir)
     set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
+
+
+def install_jdk_macos(jdk_version, jdk_arch):
+    _install_jdk(jdk_version, jdk_arch, "tar.gz")
 
 
 def install_jdk_linux(jdk_version, jdk_arch):
-    jdk_url = (
-        f"https://github.com/adoptium/temurin17-binaries/releases/download/"
-        f"jdk-{jdk_version.replace('-', '%2B')}/"
-        f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.tar.gz"
-    )
-    jdk_install_dir = os.path.expanduser("~/jdk")
-    archive_path = f"{get_home_dir()}/jdk.tar.gz"
-
-    download_jdk_archive(jdk_url, archive_path, jdk_version, sha256=pinned_jdk_sha256(jdk_url))
-    prepare_managed_jdk_root(jdk_install_dir, jdk_version)
-    extract_tar_archive(archive_path, jdk_install_dir)
-    set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
+    _install_jdk(jdk_version, jdk_arch, "tar.gz")
 
 
 def install_jdk_windows(jdk_version, jdk_arch):
-    jdk_url = (
-        f"https://github.com/adoptium/temurin17-binaries/releases/download/"
-        f"jdk-{jdk_version.replace('-', '%2B')}/"
-        f"OpenJDK17U-{jdk_arch}_{jdk_version.replace('-', '_')}.zip"
-    )
-    jdk_install_dir = os.path.expanduser("~/jdk")
-    archive_path = f"{get_home_dir()}/jdk.zip"
-
-    download_jdk_archive(jdk_url, archive_path, jdk_version, sha256=pinned_jdk_sha256(jdk_url))
-    prepare_managed_jdk_root(jdk_install_dir, jdk_version)
-    extract_zip_archive(archive_path, jdk_install_dir)
-    set_jdk_env_vars(f"{jdk_install_dir}/{managed_jdk_dir_name(jdk_version)}")
+    _install_jdk(jdk_version, jdk_arch, "zip")
 
 
 def set_jdk_env_vars_for_windows(jdk_install_dir):
@@ -735,21 +779,13 @@ def _fail_java_install_help():
 
 
 def _install_and_activate_jdk17():
-    """Install Temurin 17 under ~/jdk and activate it in this process."""
-    click.echo(click.style("Installing / upgrading OpenJDK 17 under ~/jdk ...", fg="yellow"))
-    install_jdk()
-    jdk_home = get_default_managed_jdk17_home()
-    activate_jdk_in_process(jdk_home)
+    """Install the newest GA Temurin 17 patch under ~/jdk and activate it."""
+    click.echo(click.style("Installing / upgrading the latest OpenJDK 17 under ~/jdk ...", fg="yellow"))
+    install_latest_jdk(GEOWEAVER_MIN_JAVA_MAJOR)
     java_bin = find_managed_java_bin(min_major=GEOWEAVER_MIN_JAVA_MAJOR)
-    if not java_bin:
-        # Fall back to expected layout even if version probe failed briefly.
-        for exe in ("java", "java.exe"):
-            candidate = os.path.join(jdk_home, "bin", exe)
-            if os.path.isfile(candidate):
-                java_bin = candidate
-                break
     if not java_bin or not is_java_installed(java_bin):
         _fail_java_install_help()
+    activate_jdk_in_process(_java_home_from_bin(java_bin))
     click.echo(click.style(f"Using managed JDK: {java_bin}", fg="green"))
     return java_bin
 

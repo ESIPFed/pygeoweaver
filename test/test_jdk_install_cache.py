@@ -15,6 +15,7 @@ from pygeoweaver.jdk_utils import (
     managed_jdk_dir_name,
     move_aside_path,
     prepare_managed_jdk_root,
+    temurin_release_url,
 )
 
 
@@ -29,6 +30,12 @@ def _make_tar(path: Path, top_dir: str, inner_file: str = "bin/java"):
 
 def test_managed_jdk_dir_name():
     assert managed_jdk_dir_name("17.0.13-11") == "jdk-17.0.13+11"
+
+
+def test_temurin_release_url_supports_newer_java_majors():
+    url = temurin_release_url("25.0.4.1-1", "jdk_x64_linux_hotspot", "tar.gz")
+    assert "temurin25-binaries" in url
+    assert "OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz" in url
 
 
 def test_archive_matches_rejects_jdk11(tmp_path):
@@ -85,6 +92,16 @@ def test_prepare_managed_jdk_root_moves_aside_jdk11(tmp_path):
     backups = list(root.glob("jdk-11.0.18+10.bak.*"))
     assert len(backups) == 1
     assert (backups[0] / "bin" / "java").read_text() == "old"
+
+
+def test_prepare_managed_jdk_root_preserves_other_supported_jdk(tmp_path):
+    root = tmp_path / "jdk"
+    existing = root / "jdk-17.0.21+9"
+    existing.mkdir(parents=True)
+
+    prepare_managed_jdk_root(str(root), "25.0.4.1-1")
+
+    assert existing.exists()
 
 
 def test_move_aside_path_renames(tmp_path):

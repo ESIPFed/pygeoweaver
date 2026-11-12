@@ -18,7 +18,7 @@ To install PyGeoWeaver, ensure you have **Python 3.7+**.
 **Java / Geoweaver selection (automatic):**
 
 - **Java 17+** → downloads and runs **latest Geoweaver** (2.2+ / Spring Boot 3) from the `latest` release asset.
-- **No Java** → PyGeoWeaver installs **Temurin 17** under `~/jdk`, then uses latest Geoweaver.
+- **No Java** → PyGeoWeaver installs the latest GA **Temurin 17** patch under `~/jdk`, then uses latest Geoweaver.
 - **PyGeoWeaver-managed JDK** (`~/jdk/...`) older than 17 → **bumps that JDK to 17** before start, then uses latest Geoweaver.
 - **System JDK older than 17** (not under `~/jdk`) → keeps your JDK and automatically uses **Geoweaver 2.1.x** (legacy jar), with a clear warning.
 
@@ -26,6 +26,10 @@ You can also install a managed JDK yourself:
 
 ```bash
 gw installjdk
+# Or install the latest Java 25 LTS patch:
+gw installjdk --major 25
+# Or select one exact Temurin build:
+gw installjdk --version 25.0.4.1-1
 ```
 
 **Cluster / no-sudo note (fixed in 1.4.1):** an old `~/jdk.tar.gz` from Java 11 must not be reused when installing Temurin 17. PyGeoWeaver now detects a mismatched archive, downloads a fresh copy, and moves aside other `~/jdk/jdk-*` folders before extract so `Permission denied` on locked `jdk-11*` files is avoided.

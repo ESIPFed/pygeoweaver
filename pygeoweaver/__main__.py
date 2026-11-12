@@ -685,52 +685,34 @@ def upgrade_command(force, no_start):
 @click.option('--install-dir', help='Custom installation directory for JDK', type=str)
 @click.option(
     '--version',
-    default="17.0.13-11",
-    help='Temurin JDK version to install (default: 17.0.13-11). Latest Geoweaver needs Java 17+.',
+    default=None,
+    help='Install a specific Temurin build, e.g. 25.0.4.1-1.',
     type=str,
 )
-def install_jdk_command(install_dir, version):
+@click.option(
+    '--major',
+    default=17,
+    show_default=True,
+    type=click.IntRange(min=17),
+    help='Install the latest GA Temurin release for this Java major, e.g. 25.',
+)
+def install_jdk_command(install_dir, version, major):
     """
-    Force install OpenJDK (Temurin 17 by default) in the home or custom directory.
+    Install a verified Temurin JDK in the home or custom directory.
 
-    Latest Geoweaver requires Java 17+. JDK < 17 is no longer supported for current
-    releases; stay on Geoweaver 2.1.x if you cannot upgrade Java.
+    The default installs the newest Java 17 patch. Use ``--major 25`` to install
+    the newest Java 25 LTS patch, or ``--version`` to select an exact build.
     """
-    from pygeoweaver.jdk_utils import install_jdk_macos, install_jdk_linux, install_jdk_windows
-    import platform
+    from pygeoweaver.jdk_utils import install_jdk, install_latest_jdk
 
-    system = platform.system()
-    architecture = platform.machine()
-    
     if install_dir:
         os.environ['HOME'] = install_dir
-
-    if system == "Darwin":
-        if architecture == "x86_64":
-            install_jdk_macos(version, "jdk_x64_mac_hotspot")
-        elif architecture == "arm64":
-            install_jdk_macos(version, "jdk_aarch64_mac_hotspot")
-        else:
-            click.echo("Unsupported architecture.")
-
-    elif system == "Linux":
-        if architecture == "x86_64":
-            install_jdk_linux(version, "jdk_x64_linux_hotspot")
-        elif architecture == "aarch64":
-            install_jdk_linux(version, "jdk_aarch64_linux_hotspot")
-        else:
-            click.echo("Unsupported architecture.")
-
-    elif system == "Windows":
-        if architecture == "AMD64" or architecture == "x86_64":
-            install_jdk_windows(version, "jdk_x64_windows_hotspot")
-        elif architecture == "x86-32":
-            install_jdk_windows(version, "jdk_x86-32_windows_hotspot")
-        else:
-            click.echo("Unsupported architecture.")
-
+    if version:
+        if major != 17:
+            raise click.UsageError("Use either --major or --version, not both.")
+        install_jdk(version)
     else:
-        click.echo("Unsupported platform.")
+        install_latest_jdk(major)
 
 
 if __name__ == "__main__":

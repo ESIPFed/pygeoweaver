@@ -493,23 +493,28 @@ def test_download_rejects_bad_digest_and_http(tmp_path):
         jdk_utils._fetch("http://x/jdk.tar.gz", str(target))
 
 
+def test_jdk_checksum_is_retrieved_only_from_official_temurin_release():
+    response = MagicMock()
+    response.read.return_value = b"a" * 64 + b"  OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz\n"
+    response.__enter__.return_value = response
+    url = "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz"
+    with patch.object(jdk_utils.urllib.request, "urlopen", return_value=response):
+        assert jdk_utils.pinned_jdk_sha256(url) == "a" * 64
+    with pytest.raises(RuntimeError):
+        jdk_utils.pinned_jdk_sha256("https://x/OpenJDK25U-jdk.tar.gz")
+
+
 @pytest.mark.skipif(os.getenv("PYGEOWEAVER_NETWORK_TESTS") != "1",
                     reason="set PYGEOWEAVER_NETWORK_TESTS=1 (CI does)")
-def test_pinned_digests_match_publishers():
+def test_h2_pinned_digests_match_publishers():
     import urllib.request
 
     from pygeoweaver import h2_utils
 
-    def published(url):
-        with urllib.request.urlopen(url, timeout=30) as r:
-            return r.read().decode().split()[0].lower()
-
-    base = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.13%2B11/"
-    for name, digest in jdk_utils.TEMURIN_SHA256.items():
-        assert published(base + name + ".sha256.txt") == digest, name
     for ver, digest in h2_utils.H2_JAR_SHA256.items():
         url = f"https://repo1.maven.org/maven2/com/h2database/h2/{ver}/h2-{ver}.jar.sha256"
-        assert published(url) == digest, ver
+        with urllib.request.urlopen(url, timeout=30) as response:
+            assert response.read().decode().split()[0].lower() == digest, ver
 
 
 def test_download_has_an_overall_deadline():
@@ -518,16 +523,3 @@ def test_download_has_an_overall_deadline():
     with patch.object(jdk_utils.time, "monotonic", side_effect=lambda: next(ticks)):
         with pytest.raises(RuntimeError, match="longer than"):
             jdk_utils.copy_with_deadline([b"a", b"b", b"c"], out, "https://x", deadline_s=10)
-
-
-def test_every_managed_jdk_archive_has_a_pinned_digest():
-    from pygeoweaver.constants import GEOWEAVER_MANAGED_JDK17_VERSION as v
-
-    ver = v.replace("-", "_")
-    for arch, ext in [("jdk_x64_mac_hotspot", "tar.gz"), ("jdk_aarch64_mac_hotspot", "tar.gz"),
-                      ("jdk_x64_linux_hotspot", "tar.gz"), ("jdk_aarch64_linux_hotspot", "tar.gz"),
-                      ("jdk_x64_windows_hotspot", "zip"), ("jdk_x86-32_windows_hotspot", "zip")]:
-        url = f"https://github.com/adoptium/x/OpenJDK17U-{arch}_{ver}.{ext}"
-        assert len(jdk_utils.pinned_jdk_sha256(url)) == 64
-    with pytest.raises(RuntimeError):
-        jdk_utils.pinned_jdk_sha256("https://x/OpenJDK17U-unknown.tar.gz")

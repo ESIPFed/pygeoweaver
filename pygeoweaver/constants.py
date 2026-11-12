@@ -19,5 +19,6 @@ GEOWEAVER_LEGACY_JAR_URL = (
 # Channel markers written next to ~/geoweaver.jar so re-download happens on switch.
 GEOWEAVER_JAR_CHANNEL_LATEST = "latest"
 GEOWEAVER_JAR_CHANNEL_LEGACY = "legacy"
-# Temurin 17 layout used when pygeoweaver installs/manages a JDK under ~/jdk.
-GEOWEAVER_MANAGED_JDK17_VERSION = "17.0.13-11"
+# Fallback Temurin 17 layout used when a version-specific install is requested.
+# Normal installs resolve the newest GA patch in the requested Java major.
+GEOWEAVER_MANAGED_JDK17_VERSION = "17.0.21-9"
