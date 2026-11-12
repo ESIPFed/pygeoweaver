@@ -3,11 +3,14 @@ name: Publish PyGeoweaver Python 🐍 distributions 📦 to PyPI and TestPyPI
 on:
   release:
     types: [published]  # Trigger the workflow when a release is published
+  workflow_dispatch:
 
 jobs:
   test-installation:
     name: Test Python Installation for 3.8, 3.9, 3.10, 3.11
-    runs-on: ubuntu-latest
+    # Python 3.8 and 3.9 are unavailable on the moving ubuntu-latest image
+    # (currently Ubuntu 26.04), but PyGeoWeaver still supports them.
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         python-version: ['3.8', '3.9', '3.10', '3.11']
