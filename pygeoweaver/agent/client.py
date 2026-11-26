@@ -11,6 +11,8 @@ import http.cookiejar
 import json
 import os
 import re
+import shutil
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -145,19 +147,24 @@ class AgentClient:
 
     # ------------------------------------------------------------------ transport
 
-    def request(self, method, path, body=None, params=None, auth=True, timeout=None):
+    def _open(self, method, path, body=None, params=None, auth=True, timeout=None,
+              raw_body=None, accept="application/json"):
+        """Send one request and return the open response (caller closes it)."""
         url = f"{self.base_url}/api/v1{path}"
         if params:
-            query = {k: v for k, v in params.items() if v is not None}
+            query = {k: _param(v) for k, v in params.items() if v is not None}
             if query:
                 url += "?" + urllib.parse.urlencode(query)
-        headers = {"Accept": "application/json"}
+        headers = {"Accept": accept}
         data = None
-        if body is not None:
+        if raw_body is not None:
+            data = raw_body
+            headers["Content-Type"] = "application/json"
+        elif body is not None:
             data = json.dumps(body).encode("utf-8")
             headers["Content-Type"] = "application/json"
         # OOD session cookies are credentials too.
-        if (auth or body is not None or self.uses_cookies) and not self.allow_insecure:
+        if (auth or data is not None or self.uses_cookies) and not self.allow_insecure:
             self._require_secure_transport()
         if auth:
             if not self.token:
@@ -174,8 +181,7 @@ class AgentClient:
                 headers["X-Geoweaver-Agent-Token"] = self.token
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with self._opener.open(req, timeout=timeout or self.timeout) as resp:
-                raw = resp.read()
+            return self._opener.open(req, timeout=timeout or self.timeout)
         except urllib.error.HTTPError as e:
             raise self._http_error(e) from None
         except (urllib.error.URLError, http.client.HTTPException, OSError) as e:
@@ -186,6 +192,18 @@ class AgentClient:
                 "Run `gw agent ensure` to start it.",
                 exit_code=EXIT_UNREACHABLE,
             ) from None
+
+    def request(self, method, path, body=None, params=None, auth=True, timeout=None,
+                raw_body=None):
+        url = f"{self.base_url}/api/v1{path}"
+        resp = self._open(method, path, body=body, params=params, auth=auth, timeout=timeout,
+                          raw_body=raw_body)
+        try:
+            with resp:
+                raw = resp.read()
+        except (http.client.HTTPException, OSError) as e:
+            raise AgentError("unreachable", f"Connection to {self.base_url} broke: {e}",
+                             exit_code=EXIT_UNREACHABLE) from None
         if not raw:
             return None
         try:
@@ -229,6 +247,12 @@ class AgentClient:
             pass
         if status == 401:
             message = f"{message}. Run `gw agent login` to mint a fresh token for {self.base_url}."
+        elif status == 409 and "replace=true" in str(message):
+            message = (str(message).replace("Re-send with ?replace=true to overwrite.", "").strip()
+                       + " Import again with --replace (Python: replace=True) to overwrite.")
+        elif error == "local_only":
+            message = (f"{message}. This Geoweaver answers only programs on its own computer: "
+                       "install pygeoweaver there and run `ssh user@host gw agent ...`.")
         return AgentError(error, f"HTTP {status}: {message}", status=status,
                           exit_code=_exit_code_for_status(status))
 
@@ -273,13 +297,15 @@ class AgentClient:
 
     # ------------------------------------------------------------------ processes
 
-    def list_processes(self):
-        return self.request("GET", "/processes")
+    def list_processes(self, query=None):
+        """Processes; ``query`` filters by id, name or description on the server."""
+        return self.request("GET", "/processes", params={"q": query})
 
     def get_process(self, process_id):
         return self.request("GET", f"/processes/{_seg(process_id)}")
 
     def create_process(self, name, code, lang="python", description=None):
+        """``lang``: ``python``, ``shell`` or ``builtin``."""
         return self.request(
             "POST", "/processes",
             body={"name": name, "lang": lang, "code": code, "description": description},
@@ -291,11 +317,20 @@ class AgentClient:
             body={"name": name, "lang": lang, "code": code, "description": description},
         )
 
-    def run_process(self, process_id, env_id=None, host_password=None, client_run_key=None):
+    def delete_process(self, process_id):
+        """Delete a process (HTTP 409 while a workflow still uses it)."""
+        return self.request("DELETE", f"/processes/{_seg(process_id)}")
+
+    def run_process(self, process_id, env_id=None, host_password=None, client_run_key=None,
+                    host_id=None):
+        """
+        Start a process run. ``host_id`` defaults to the Geoweaver server itself (100001);
+        an SSH host needs its ``host_password`` (used for this call only, never stored).
+        """
         return self.request(
             "POST", f"/processes/{_seg(process_id)}/runs",
-            body={"hostId": None, "hostPassword": host_password, "envId": env_id,
-                  "clientRunKey": client_run_key},
+            body={"hostId": _opt_seg(host_id, "host id"), "hostPassword": host_password,
+                  "envId": _opt_seg(env_id, "environment id"), "clientRunKey": client_run_key},
         )
 
     def list_process_runs(self, process_id, log_limit=None):
@@ -306,8 +341,9 @@ class AgentClient:
 
     # ------------------------------------------------------------------ workflows
 
-    def list_workflows(self):
-        return self.request("GET", "/workflows")
+    def list_workflows(self, query=None):
+        """Workflows; ``query`` filters by id, name or description on the server."""
+        return self.request("GET", "/workflows", params={"q": query})
 
     def get_workflow(self, workflow_id):
         return self.request("GET", f"/workflows/{_seg(workflow_id)}")
@@ -326,11 +362,114 @@ class AgentClient:
                   "description": description},
         )
 
-    def run_workflow(self, workflow_id, mode="one", host_password=None, client_run_key=None):
-        return self.request(
-            "POST", f"/workflows/{_seg(workflow_id)}/runs",
-            body={"mode": mode, "hostPassword": host_password, "clientRunKey": client_run_key},
-        )
+    def delete_workflow(self, workflow_id):
+        """Delete a workflow; its processes and run history are kept."""
+        return self.request("DELETE", f"/workflows/{_seg(workflow_id)}")
+
+    def run_workflow(self, workflow_id, mode="one", host_password=None, client_run_key=None,
+                     host_id=None, env_id=None, node_hosts=None, host_passwords=None):
+        """
+        Start a workflow run.
+
+        :param host_id: run every step on this host (default: the Geoweaver server).
+        :param env_id: Python environment for every step.
+        :param node_hosts: per-step hosts, ``{node_id: {"hostId": ..., "envId": ...}}``.
+        :param host_passwords: SSH passwords per host id, ``{host_id: password}``; used for
+            this run only, never stored.
+        """
+        body = {"mode": mode, "hostPassword": host_password, "clientRunKey": client_run_key,
+                "hostId": _opt_seg(host_id, "host id"), "envId": _opt_seg(env_id, "environment id")}
+        if node_hosts:
+            body["nodeHosts"] = {
+                str(node): {"hostId": _opt_seg((h or {}).get("hostId"), "host id"),
+                            "envId": _opt_seg((h or {}).get("envId"), "environment id")}
+                for node, h in node_hosts.items()
+            }
+        if host_passwords:
+            body["hostPasswords"] = {_seg(h, "host id"): pw for h, pw in host_passwords.items()}
+        return self.request("POST", f"/workflows/{_seg(workflow_id)}/runs", body=body)
+
+    def list_workflow_runs(self, workflow_id, log_limit=None):
+        """Workflow run history, newest first (up to 50), with per-step status."""
+        return self.request("GET", f"/workflows/{_seg(workflow_id)}/runs",
+                            params={"logLimit": log_limit})
+
+    def set_step_skipped(self, workflow_id, node_id, skip=True):
+        """Skip (or stop skipping) one step on later runs; it shows as Skipped."""
+        return self.request("PUT", f"/workflows/{_seg(workflow_id)}/steps/{_seg(node_id, 'node id')}",
+                            body={"skip": bool(skip)})
+
+    def list_checkpoints(self, workflow_id):
+        """Graph and code snapshots saved at each run, newest first."""
+        return self.request("GET", f"/workflows/{_seg(workflow_id)}/checkpoints")
+
+    def restore_checkpoint(self, workflow_id, run_id):
+        """Restore the graph and step code that the run ``run_id`` used."""
+        return self.request("POST", f"/workflows/{_seg(workflow_id)}/restore",
+                            body={"runId": _seg(run_id, "run id")})
+
+    def export_workflow(self, workflow_id):
+        """A JSON bundle: the workflow plus the code of every process it uses."""
+        return self.request("GET", f"/workflows/{_seg(workflow_id)}/export")
+
+    def import_workflow(self, bundle, replace=False):
+        """
+        Import a bundle from :meth:`export_workflow` (a dict, JSON text, or a file path).
+        Ids are kept; HTTP 409 when different content exists under them unless ``replace``.
+        """
+        if isinstance(bundle, (dict, list)):
+            raw = json.dumps(bundle).encode("utf-8")
+        elif isinstance(bundle, bytes):
+            raw = bundle
+        elif isinstance(bundle, os.PathLike) or (isinstance(bundle, str) and os.path.isfile(bundle)):
+            with open(bundle, "rb") as f:
+                raw = f.read()
+        elif isinstance(bundle, str):
+            raw = bundle.encode("utf-8")
+        else:
+            raise AgentError("bad_request", "bundle must be a dict, JSON text or a file path",
+                             exit_code=EXIT_USAGE)
+        try:
+            if not isinstance(json.loads(raw.decode("utf-8")), dict):
+                raise ValueError
+        except ValueError:
+            raise AgentError("bad_request", "Workflow bundle is not valid JSON",
+                             exit_code=EXIT_USAGE) from None
+        return self.request("POST", "/workflows/import", raw_body=raw,
+                            params={"replace": "true" if replace else None})
+
+    # ------------------------------------------------------------------ hosts
+
+    def list_hosts(self, query=None):
+        """Hosts (no passwords are stored); ``query`` filters by id, name, ip or url."""
+        return self.request("GET", "/hosts", params={"q": query})
+
+    def get_host(self, host_id):
+        return self.request("GET", f"/hosts/{_seg(host_id, 'host id')}")
+
+    def create_host(self, name, type="ssh", ip=None, port=None, username=None, url=None):
+        """Add a host. ssh: ``ip``, ``port``, ``username``; jupyter/jupyterhub/jupyterlab/gee: ``url``."""
+        return self.request("POST", "/hosts", body=_host_body(name, type, ip, port, username, url))
+
+    def update_host(self, host_id, name=None, type=None, ip=None, port=None, username=None,
+                    url=None):
+        """Edit a host; omitted fields are kept."""
+        return self.request("PUT", f"/hosts/{_seg(host_id, 'host id')}",
+                            body=_host_body(name, type, ip, port, username, url))
+
+    def delete_host(self, host_id):
+        """Delete a host and its saved environments (run history is kept)."""
+        return self.request("DELETE", f"/hosts/{_seg(host_id, 'host id')}")
+
+    def list_environments(self, host_id):
+        """Python environments saved for a host; pass an ``id`` as ``env_id`` to runs."""
+        return self.request("GET", f"/hosts/{_seg(host_id, 'host id')}/environments")
+
+    def scan_environments(self, host_id, host_password=None, timeout=None):
+        """Find and save the Python environments on a host (SSH hosts need ``host_password``)."""
+        return self.request("POST", f"/hosts/{_seg(host_id, 'host id')}/environments/scan",
+                            body={"hostPassword": host_password},
+                            timeout=timeout or max(self.timeout, 120.0))
 
     # ------------------------------------------------------------------ runs
 
@@ -349,21 +488,61 @@ class AgentClient:
             run = dict(run, steps=steps)
         return run
 
-    def get_run(self, history_id, log_limit=None):
+    def get_run(self, history_id, log_limit=None, wait_seconds=None, include_step_logs=None):
+        """
+        Run status and log. ``wait_seconds`` (up to 60) lets the server hold the answer until
+        the run ends; ``include_step_logs`` adds each workflow step's log.
+        """
+        wait = None
+        if wait_seconds:
+            wait = max(0, min(int(wait_seconds), MAX_SERVER_WAIT))
         return self.request(
-            "GET", f"/runs/{_seg(history_id)}", params={"logLimit": log_limit}
+            "GET", f"/runs/{_seg(history_id)}",
+            params={"logLimit": log_limit, "waitSeconds": wait or None,
+                    "includeStepLogs": "true" if include_step_logs else None},
+            timeout=(self.timeout + wait) if wait else None,
         )
+
+    def list_runs(self, limit=None, status=None, log_limit=None):
+        """Newest runs first. ``status="Running"`` lists active runs; ``limit`` 1-500."""
+        return self.request("GET", "/runs",
+                            params={"limit": limit, "status": status, "logLimit": log_limit})
 
     def stop_run(self, history_id):
         return self.request("POST", f"/runs/{_seg(history_id)}/stop")
 
+    def delete_run(self, history_id):
+        """Delete a finished run (a workflow run also removes its step runs)."""
+        return self.request("DELETE", f"/runs/{_seg(history_id)}")
+
+    def delete_runs(self, status, process_id=None):
+        """Delete all runs with ``status`` ``Failed`` or ``Skipped``, optionally of one process."""
+        if status not in ("Failed", "Skipped"):
+            raise AgentError("bad_request", "Bulk delete takes status Failed or Skipped",
+                             exit_code=EXIT_USAGE)
+        return self.request("DELETE", "/runs",
+                            params={"status": status, "processId": _opt_seg(process_id)})
+
+    def set_run_notes(self, history_id, notes):
+        """Set the notes shown with this run in the Geoweaver history."""
+        return self.request("PUT", f"/runs/{_seg(history_id)}/notes", body={"notes": notes})
+
     def wait_run(self, history_id, timeout=600.0, interval=1.0, log_limit=None, on_poll=None):
-        """Poll a run until it reaches a terminal status; raises ``AgentError`` on timeout."""
+        """
+        Wait until a run reaches a terminal status; raises ``AgentError`` on timeout.
+
+        The server holds each request until the run ends (up to 30 s at a time), so a long run
+        costs a request every 30 s, not a poll every second. Older servers that answer at once
+        are polled with back-off up to ``interval``.
+        """
         deadline = time.monotonic() + timeout
         interval = max(interval, MIN_POLL_INTERVAL)
         delay = MIN_POLL_INTERVAL
         while True:
-            run = self.get_run(history_id, log_limit=log_limit)
+            remaining = deadline - time.monotonic()
+            hold = int(max(0, min(remaining, LONG_POLL_SECONDS)))
+            asked = time.monotonic()
+            run = self.get_run(history_id, log_limit=log_limit, wait_seconds=hold or None)
             if on_poll:
                 on_poll(run)
             if run.get("terminal") or run.get("status") in TERMINAL_STATUSES:
@@ -375,8 +554,96 @@ class AgentClient:
                     "(it keeps running on the server; poll again or stop it)",
                     exit_code=EXIT_TIMEOUT,
                 )
-            time.sleep(delay)
-            delay = min(delay * 2, interval)
+            if time.monotonic() - asked < max(1.0, hold / 2):
+                # The server did not hold the request (older Geoweaver): back off.
+                time.sleep(min(delay, max(0.0, deadline - time.monotonic())))
+                delay = min(delay * 2, interval)
+
+    # ------------------------------------------------------------------ results
+
+    def list_results(self, path=None):
+        """One folder of the Geoweaver results folder (``path`` is relative to it)."""
+        return self.request("GET", "/results", params={"path": _result_path(path, allow_empty=True)})
+
+    def open_result(self, path):
+        """Open one result file for reading (a binary file-like object; close it after)."""
+        return self._open("GET", "/results/file", params={"path": _result_path(path)},
+                          accept="application/octet-stream, application/json;q=0.9")
+
+    def download_result(self, path, dest=".", overwrite=False):
+        """
+        Save one result file. ``dest`` is a folder (the file keeps its name; a path ending in
+        ``/`` is created as a folder) or a file path. Never overwrites an existing file unless
+        ``overwrite``; returns the saved path. The file is created readable only by you.
+        """
+        rel = _result_path(path)
+        name = os.path.basename(rel)
+        dest = str(dest)
+        if dest.endswith(("/", os.sep)):
+            os.makedirs(dest, exist_ok=True)
+        target = os.path.join(dest, name) if os.path.isdir(dest) else dest
+        target = os.path.abspath(target)
+        if os.path.exists(target) and not overwrite:
+            raise AgentError("exists", f"{target} already exists "
+                             "(gw agent: --force; Python: overwrite=True)", exit_code=EXIT_USAGE)
+        folder = os.path.dirname(target)
+        if not os.path.isdir(folder):
+            raise AgentError("bad_request", f"Folder {folder} does not exist", exit_code=EXIT_USAGE)
+        fd, tmp = tempfile.mkstemp(prefix=".gw-download-", dir=folder)
+        try:
+            with os.fdopen(fd, "wb") as out:
+                self.copy_result(path, out)
+            os.replace(tmp, target)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+        return target
+
+    def copy_result(self, path, out):
+        """Stream one result file into the binary file object ``out``."""
+        resp = self.open_result(path)
+        try:
+            with resp:
+                shutil.copyfileobj(resp, out, 1024 * 1024)
+        except (http.client.HTTPException, OSError) as e:
+            raise AgentError("unreachable", f"Download of {path!r} from {self.base_url} broke: {e}",
+                             exit_code=EXIT_UNREACHABLE) from None
+
+
+MAX_SERVER_WAIT = 60
+LONG_POLL_SECONDS = 30
+
+
+def _param(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return value
+
+
+def _opt_seg(value, what="id"):
+    return None if value in (None, "") else _seg(value, what)
+
+
+def _host_body(name, type, ip, port, username, url):
+    return {"name": name, "type": type, "ip": ip,
+            "port": None if port is None else str(port), "username": username, "url": url}
+
+
+def _result_path(path, allow_empty=False):
+    """A results path relative to the results folder; no ``..``, no absolute paths."""
+    if path in (None, "", "."):
+        if allow_empty:
+            return None
+        raise AgentError("bad_request", "A result file path is required", exit_code=EXIT_USAGE)
+    p = str(path).replace("\\", "/")
+    parts = [x for x in p.split("/") if x not in ("", ".")]
+    if p.startswith("/") or ".." in parts or not parts or any("\x00" in x for x in parts):
+        raise AgentError("bad_request", f"Invalid result path {str(path)[:80]!r}: use a path "
+                         "relative to the results folder, without '..'", exit_code=EXIT_USAGE)
+    return "/".join(parts)
 
 
 _STEP_IDS = re.compile(r"^(?:[A-Za-z0-9]+;)+$")

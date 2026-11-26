@@ -35,7 +35,7 @@ gw installjdk --version 25.0.4.1-1
 **Cluster / no-sudo note (fixed in 1.4.1):** an old `~/jdk.tar.gz` from Java 11 must not be reused when installing Temurin 17. PyGeoWeaver now detects a mismatched archive, downloads a fresh copy, and moves aside other `~/jdk/jdk-*` folders before extract so `Permission denied` on locked `jdk-11*` files is avoided.
 
 Manual legacy jar (optional):
-[v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar).
+[v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7-pre/geoweaver.jar).
 
 You can then install PyGeoWeaver using pip:
 
@@ -46,18 +46,24 @@ pip install pygeoweaver
 ## AI agents (fast, over SSH)
 
 `gw agent …` drives a **running** Geoweaver through its Agent API: JSON output, ~0.2 s per
-call instead of booting a JVM, and every change shows up live in the Geoweaver GUI. Built for
-AI agents that reach Geoweaver over SSH (firewall, VPN, Open OnDemand).
+call instead of booting a JVM, and every change shows up live in the Geoweaver GUI. It covers
+everything the Agent API offers: processes, workflows, hosts and Python environments, runs and
+their logs, step skipping, checkpoints, export and import, and result files.
+
+The recommended setup is **AI agent → SSH → `gw agent` → Geoweaver**: install pygeoweaver on
+the Geoweaver machine, give your laptop an SSH key login to it (a `Host gw` entry in
+`~/.ssh/config`), and the agent runs every command through SSH. Nothing is opened to the
+network and the agent never sees the Geoweaver password.
 
 ```bash
-gw agent ensure                       # make sure Geoweaver is up (never restarts it)
-gw agent login                        # once: GUI password -> stored token (0600)
-gw agent process create --name hello --lang python --code 'print(42)'
-gw agent process run <id> --wait
-gw agent guide                        # playbook for the AI
+ssh gw 'pip install -U pygeoweaver && gw agent ensure'   # once
+ssh -t gw 'gw agent login'                               # once: GUI password -> token stored on the server
+echo 'print(42)' | ssh gw gw agent process create --name hello --lang python --code -
+ssh gw gw agent process run <id> --wait
+ssh gw gw agent guide                                    # playbook for the AI
 ```
 
-See [docs/agent-ssh.md](docs/agent-ssh.md).
+Setup details and the full command list: [docs/agent-ssh.md](docs/agent-ssh.md).
 
 ## Startup
 
