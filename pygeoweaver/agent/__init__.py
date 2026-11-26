@@ -41,37 +41,65 @@ GUIDE = """\
 # Geoweaver agent playbook (`gw agent`)
 
 You are driving a **live** Geoweaver server that a human may be using in the GUI at the
-same time. Everything below goes through the server's Agent API (`/api/v1`):
-calls take milliseconds, never restart or lock the server, and every create/update
-shows up in open Geoweaver browsers immediately.
+same time. Everything below goes through the server's Agent API (`/api/v1`): calls take
+milliseconds, never restart or lock the server, and every change shows up in open
+Geoweaver browsers immediately.
+
+## 0. Where to run these commands
+Run `gw agent` **on the Geoweaver machine**. From a laptop, put `ssh <host>` in front:
+    ssh gw gw agent status
+The SSH login must work without a prompt (key login; check `ssh -o BatchMode=yes gw true`).
+Send files on standard input instead of copying them:
+    ssh gw gw agent process create --name fetch --lang python --file - < fetch.py
+Arguments go through the remote shell, which splits them again: pass text with spaces
+on stdin (`--code -`, `--text -`), as in the examples below, or quote it twice
+(`--code "'echo hi'"`).
 
 ## 1. Connect (once per session)
     gw agent ensure          # up? -> returns at once. Down? -> starts it detached. Never restarts.
     gw agent status          # baseUrl, healthy, auth=ok|missing|invalid
-If `auth` is `missing`/`invalid`, ask the human to run (or pipe the password yourself
-only if they gave it to you for that purpose):
-    gw agent login           # prompts for the Geoweaver GUI password; stores a token (0600)
-    printf '%s\\n' "$PW" | gw agent login --password-stdin
+If `auth` is `missing`/`invalid`, ask the human to run `ssh -t <host> gw agent login`
+(it prompts for the Geoweaver GUI password and stores a token on that machine).
 
 ## 2. Build
     gw agent process create --name fetch --lang python --file fetch.py
-    gw agent process create --name plot  --lang shell  --code 'echo plotting'
+    printf 'echo plotting\\n' | gw agent process create --name plot --lang shell --code -
     gw agent process update <pid> --file fetch.py         # edit in place
     gw agent workflow create --name pipeline --chain <pid1>,<pid2>   # sequential edges
-    gw agent process list --name fetch
+    gw agent process list -q fetch
     gw agent workflow list
+    gw agent workflow skip <wid> <nodeId>                 # skip a step (--off to undo)
 
 ## 3. Run and monitor
     gw agent process run <pid> --wait --timeout 600        # exit 0 iff Done
     gw agent workflow run <wid> --key run-2026-10-24       # retry-safe start (same token + server uptime)
-    gw agent run get <historyId>     # status, terminal, log tail
+    gw agent run get <historyId>     # status, terminal, log tail, per-step results
     gw agent run wait <historyId>    # block until Done/Failed/Stopped/Skipped
     gw agent run logs <historyId>    # plain-text log
     gw agent run stop <historyId>
+    gw agent run list --status Running
     gw agent process runs <pid> --limit 5
+    gw agent workflow runs <wid> --limit 5
+
+## 4. Other machines
+    gw agent host list               # 100001 is the Geoweaver machine itself
+    gw agent host envs <hostId>      # Python environments; --scan to look for more
+    printf '%s\\n' "$PW" | gw agent process run <pid> --host-id <hostId> --host-password-stdin
+Only use an SSH host password the human gave you for that purpose.
+
+## 5. History, sharing, results
+    gw agent workflow checkpoints <wid>
+    gw agent workflow restore <wid> --run-id <runId>   # graph + code of that run
+    gw agent workflow export <wid> > bundle.json
+    gw agent workflow import - < bundle.json
+    printf 'baseline run' | gw agent run notes <historyId> --text -
+    gw agent results list [folder]
+    gw agent results get <file> --out - > file
+Deletes (`process|workflow|host|run delete`, `run prune`) need `--yes`; only delete what
+the human asked you to.
 
 ## Rules
-- Runs execute on the Geoweaver machine itself (hostId 100001), not on your laptop.
+- Runs execute on the Geoweaver machine (hostId 100001) unless you pass --host-id.
 - Never `gw stop`, `gw start --force-restart`, `gw cleanh2db` or edit ~/h2 while a human
   may be using Geoweaver; `gw agent ensure` is the only start you need.
 - Never print or paste tokens/passwords, and never put them on a command line; the token
@@ -85,6 +113,6 @@ only if they gave it to you for that purpose):
   Exit codes: 0 ok, 1 error, 2 usage, 3 unreachable, 4 unauthorized/login wall/insecure
   http, 5 not found, 6 other HTTP error (incl. Geoweaver < 3.0 without Agent API),
   8 run finished but not Done, 9 port belongs to another user (or its owner cannot be
-  verified), 124 timeout.
+  verified), 124 timeout. (255 is ssh itself failing.)
 - Base URL: --base-url > GEOWEAVER_BASE_URL > GEOWEAVER_PORT > your running Geoweaver JVM > :8070.
 """
