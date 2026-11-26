@@ -38,7 +38,7 @@ else
     MANAGED_JDK17="$HOME/jdk/jdk-17.0.13+11/bin/java"
     MANAGED_JDK11="$HOME/jdk/jdk-11.0.18+10/bin/java"
     JAR_URL_LATEST="https://github.com/ESIPFed/Geoweaver/releases/download/latest/geoweaver.jar"
-    JAR_URL_LEGACY="https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar"
+    JAR_URL_LEGACY="https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7-pre/geoweaver.jar"
     CHANNEL_MARKER="$HOME/geoweaver.jar.channel"
     JAR_PATH="$HOME/geoweaver.jar"
 

@@ -35,7 +35,7 @@ gw installjdk --version 25.0.4.1-1
 **Cluster / no-sudo note (fixed in 1.4.1):** an old `~/jdk.tar.gz` from Java 11 must not be reused when installing Temurin 17. PyGeoWeaver now detects a mismatched archive, downloads a fresh copy, and moves aside other `~/jdk/jdk-*` folders before extract so `Permission denied` on locked `jdk-11*` files is avoided.
 
 Manual legacy jar (optional):
-[v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7/geoweaver.jar).
+[v2.1.7 jar](https://github.com/ESIPFed/Geoweaver/releases/download/v2.1.7-pre/geoweaver.jar).
 
 You can then install PyGeoWeaver using pip:
 
